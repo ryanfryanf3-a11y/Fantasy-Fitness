@@ -9,6 +9,10 @@ import SwiftUI
 
 @main
 struct Fantasy_FitnessApp: App {
+    init() {
+        Theme.registerFonts()
+    }
+
     var body: some Scene {
         WindowGroup {
             RootView()

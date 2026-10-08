@@ -9,6 +9,8 @@ struct TitleScreenView: View {
     let hasSave: Bool
     let onContinue: () -> Void
     let onNewGame: () -> Void
+    /// Pins the look for previews; otherwise it follows the device clock.
+    var forcedTimeOfDay: TimeOfDay? = nil
 
     @State private var showingSettings = false
     @State private var confirmingNewGame = false
@@ -17,19 +19,12 @@ struct TitleScreenView: View {
     private let saveSummary = "Level 14 Warrior · E-rank"
 
     var body: some View {
-        GeometryReader { proxy in
-            let horizonY = proxy.size.height * 0.47
-            ZStack(alignment: .top) {
-                TwilightSky(horizonY: horizonY + proxy.safeAreaInsets.top)
-
-                VStack(spacing: 0) {
-                    TitleSign()
-                        .padding(.top, 20)
-                        .frame(maxWidth: .infinity, maxHeight: horizonY, alignment: .top)
-
-                    board
-                }
-            }
+        // Re-evaluated every minute (and on return from background) so the scene
+        // changes over at 6:00 am and 6:00 pm while the screen is open.
+        TimelineView(.everyMinute) { timeline in
+            let timeOfDay = forcedTimeOfDay ?? TimeOfDay.debugOverride ?? TimeOfDay.at(timeline.date)
+            screen(timeOfDay)
+                .animation(.easeInOut(duration: 1.2), value: timeOfDay)
         }
         .sheet(isPresented: $showingSettings) {
             SettingsSheet()
@@ -41,73 +36,136 @@ struct TitleScreenView: View {
         }
     }
 
-    private var board: some View {
-        VStack(spacing: 0) {
-            BoardBeam()
-            ClassPennantRow()
-                .padding(.top, -6)
+    private func screen(_ timeOfDay: TimeOfDay) -> some View {
+        GeometryReader { proxy in
+            let groundY = proxy.size.height * 0.585
+            ZStack(alignment: .top) {
+                CastleGateScene(timeOfDay: timeOfDay, groundY: groundY + proxy.safeAreaInsets.top)
+                    .id(timeOfDay)
+                    .transition(.opacity)
 
-            Spacer(minLength: 16)
+                VStack(spacing: 0) {
+                    TitleLogo(timeOfDay: timeOfDay, width: proxy.size.width)
+                        .frame(maxWidth: .infinity, alignment: .top)
+                        .frame(height: groundY, alignment: .top)
 
-            VStack(spacing: 14) {
-                TitleMenuButton(title: "Continue",
-                                subtitle: hasSave ? saveSummary : "No adventure yet",
-                                systemImage: "play.fill",
-                                fill: Theme.waxRed, border: Theme.waxBorder,
-                                action: onContinue)
-                    .disabled(!hasSave)
-
-                TitleMenuButton(title: "New game",
-                                systemImage: "sparkles",
-                                fill: Theme.emerald, border: Theme.emeraldBorder) {
-                    if hasSave { confirmingNewGame = true } else { onNewGame() }
-                }
-
-                TitleMenuButton(title: "Settings",
-                                systemImage: "gearshape.fill",
-                                fill: Theme.darkWood, border: Theme.darkestWood,
-                                compact: true) {
-                    showingSettings = true
+                    menu(timeOfDay)
                 }
             }
-            .padding(.horizontal, 24)
+        }
+    }
 
-            Spacer(minLength: 12)
+    private func menu(_ timeOfDay: TimeOfDay) -> some View {
+        VStack(spacing: 0) {
+            // Drop the class crests on short screens rather than squeezing the buttons.
+            ViewThatFits(in: .vertical) {
+                controls(timeOfDay, showsCrests: true)
+                controls(timeOfDay, showsCrests: false)
+            }
 
-            Text("v0.1 · Train · Grow · Fight · Loot")
+            Spacer(minLength: 8)
+
+            Text("Train · Grow · Fight · Loot")
                 .font(.alegreyaSans(13, weight: .medium))
-                .foregroundStyle(Theme.cream.opacity(0.6))
+                .foregroundStyle(Theme.cream.opacity(0.9))
                 .padding(.bottom, 8)
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
-        .background(WoodBackground())
+    }
+
+    private func controls(_ timeOfDay: TimeOfDay, showsCrests: Bool) -> some View {
+        VStack(spacing: 14) {
+            if showsCrests {
+                ClassCrestRow(onPlank: timeOfDay == .day)
+            }
+
+            if hasSave {
+                TitlePrimaryButton(title: "Continue", subtitle: saveSummary,
+                                   systemImage: "play.fill", action: onContinue)
+            } else {
+                TitlePrimaryButton(title: "New game", subtitle: "Enter the guild gate",
+                                   systemImage: "plus", action: onNewGame)
+            }
+
+            HStack(spacing: 12) {
+                if hasSave {
+                    TitleSecondaryButton(title: "New game", systemImage: "plus", timeOfDay: timeOfDay) {
+                        confirmingNewGame = true
+                    }
+                } else {
+                    EmptySaveSlot(timeOfDay: timeOfDay)
+                }
+                TitleSecondaryButton(title: "Settings", systemImage: "gearshape.fill", timeOfDay: timeOfDay) {
+                    showingSettings = true
+                }
+            }
+        }
+        .padding(.horizontal, 24)
+        .padding(.top, 28)
     }
 }
 
-// MARK: - Sign
+// MARK: - Title
 
-/// The hanging "Fantasy Fitness" sign with chains and a crimson ribbon.
-private struct TitleSign: View {
+/// "Fantasy Fitness" set straight on the sky, with the guild tagline beneath.
+private struct TitleLogo: View {
+    let timeOfDay: TimeOfDay
+    let width: CGFloat
+
+    private var fontSize: CGFloat { min(78, width * 0.2) }
+
     var body: some View {
-        VStack(spacing: -12) {
-            VStack(spacing: -10) {
-                Text("Fantasy")
-                Text("Fitness")
+        VStack(spacing: 6) {
+            ZStack {
+                // Dark outline keeps the gold legible against the bright daytime sky.
+                if timeOfDay == .day {
+                    ForEach(0..<8, id: \.self) { step in
+                        let angle = Double(step) * .pi / 4
+                        wordmark
+                            .foregroundStyle(Theme.darkestWood)
+                            .offset(x: cos(angle) * 2.5, y: sin(angle) * 2.5)
+                    }
+                }
+                wordmark
+                    .foregroundStyle(Theme.gold)
+                    .shadow(color: timeOfDay == .night ? Theme.gold.opacity(0.35) : .clear, radius: 14)
             }
-            .font(.pirata(54))
-            .foregroundStyle(Theme.gold)
-            .shadow(color: Theme.darkestWood, radius: 0, x: 0, y: 3)
-            .padding(.horizontal, 34)
-            .padding(.top, 14)
-            .padding(.bottom, 22)
-            .cartoonBackground(RoundedRectangle(cornerRadius: 14), fill: Theme.darkWood,
-                               outline: Theme.darkestWood, lineWidth: 4, shadowOffset: 6)
-            .overlay(alignment: .topLeading) { cornerRivet.offset(x: 12, y: 12) }
-            .overlay(alignment: .topTrailing) { cornerRivet.offset(x: -12, y: 12) }
-            .overlay(alignment: .bottomLeading) { cornerRivet.offset(x: 12, y: -12) }
-            .overlay(alignment: .bottomTrailing) { cornerRivet.offset(x: -12, y: -12) }
-            .background(alignment: .bottom) { chains }
+            .background {
+                wordmark
+                    .foregroundStyle(Theme.darkestWood)
+                    .offset(y: timeOfDay == .day ? 6 : 4)
+            }
 
+            tagline
+        }
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel("Fantasy Fitness. A Guild of Real Strength")
+        .accessibilityAddTraits(.isHeader)
+    }
+
+    private var wordmark: some View {
+        VStack(spacing: -fontSize * 0.36) {
+            Text("Fantasy")
+            Text("Fitness")
+        }
+        .font(.pirata(fontSize))
+        // Pirata One carries a tall ascent; pull the wordmark up into it.
+        .padding(.top, -fontSize * 0.14)
+    }
+
+    @ViewBuilder
+    private var tagline: some View {
+        switch timeOfDay {
+        case .night:
+            HStack(spacing: 12) {
+                Rectangle().fill(Theme.brass).frame(width: 34, height: 2)
+                Text("A GUILD OF REAL STRENGTH")
+                    .font(.alegreyaSans(13, weight: .bold))
+                    .tracking(2.3)
+                    .foregroundStyle(Theme.cream)
+                Rectangle().fill(Theme.brass).frame(width: 34, height: 2)
+            }
+        case .day:
             Text("A Guild of Real Strength")
                 .font(.alegreya(16, weight: .heavy))
                 .foregroundStyle(Theme.cream)
@@ -116,38 +174,6 @@ private struct TitleSign: View {
                 .background(CartoonShape(shape: RibbonShape(), fill: Theme.waxRed,
                                          outline: Theme.waxBorder, shadowOffset: 4))
         }
-        .accessibilityElement(children: .ignore)
-        .accessibilityLabel("Fantasy Fitness. A Guild of Real Strength")
-        .accessibilityAddTraits(.isHeader)
-    }
-
-    private var cornerRivet: some View {
-        Circle()
-            .fill(Theme.brass)
-            .overlay(Circle().strokeBorder(Theme.darkestWood, lineWidth: 1.5))
-            .frame(width: 9, height: 9)
-    }
-
-    /// Two brass chains running off the top of the screen.
-    private var chains: some View {
-        HStack {
-            chain
-            Spacer()
-            chain
-        }
-        .padding(.horizontal, 44)
-        .frame(height: 400)
-        .offset(y: -40)
-    }
-
-    private var chain: some View {
-        Rectangle()
-            .fill(Theme.brass)
-            .frame(width: 5)
-            .overlay(
-                Rectangle()
-                    .strokeBorder(Theme.darkestWood, style: StrokeStyle(lineWidth: 1.5, dash: [6, 3]))
-            )
     }
 }
 
@@ -167,99 +193,37 @@ private struct RibbonShape: Shape {
     }
 }
 
-// MARK: - Board top
+// MARK: - Class crests
 
-/// Thick dark beam along the horizon that the pennants and torches hang from.
-private struct BoardBeam: View {
-    var body: some View {
-        Rectangle()
-            .fill(Theme.darkerWood)
-            .frame(height: 18)
-            .overlay(alignment: .top) {
-                Rectangle().fill(Theme.darkestWood).frame(height: 3)
-            }
-            .overlay(alignment: .bottom) {
-                Rectangle().fill(Theme.darkestWood).frame(height: 3)
-            }
-            .overlay(alignment: .bottom) {
-                HStack {
-                    Torch()
-                    Spacer()
-                    Torch()
-                }
-                .padding(.horizontal, 16)
-                .offset(y: -12)
-            }
-            .zIndex(1)
-    }
-}
-
-private struct Torch: View {
-    @Environment(\.accessibilityReduceMotion) private var reduceMotion
-    @State private var flicker = false
+private struct ClassCrestRow: View {
+    /// By day the crests sit on a wooden plank so the labels stay legible over the grass.
+    let onPlank: Bool
 
     var body: some View {
-        VStack(spacing: -2) {
-            ZStack(alignment: .bottom) {
-                FlameShape().fill(Theme.flameOuter)
-                    .frame(width: 22, height: 32)
-                FlameShape().fill(Theme.flameInner)
-                    .frame(width: 12, height: 18)
-                    .padding(.bottom, 2)
-            }
-            .scaleEffect(x: flicker ? 0.92 : 1.04, y: flicker ? 1.08 : 0.94, anchor: .bottom)
-            .shadow(color: Theme.flameOuter.opacity(0.7), radius: 10)
-
-            CartoonSurface(shape: RoundedRectangle(cornerRadius: 3), fill: Theme.brass,
-                           outline: Theme.darkestWood, lineWidth: 2, shadowOffset: 0)
-                .frame(width: 26, height: 10)
-            CartoonSurface(shape: Rectangle(), fill: Theme.darkWood,
-                           outline: Theme.darkestWood, lineWidth: 2, shadowOffset: 0)
-                .frame(width: 10, height: 26)
-        }
-        .onAppear {
-            guard !reduceMotion else { return }
-            withAnimation(.easeInOut(duration: 0.35).repeatForever(autoreverses: true)) {
-                flicker = true
-            }
-        }
-        .accessibilityHidden(true)
-    }
-}
-
-private struct FlameShape: Shape {
-    func path(in rect: CGRect) -> Path {
-        Path { p in
-            p.move(to: CGPoint(x: rect.midX, y: rect.minY))
-            p.addQuadCurve(to: CGPoint(x: rect.maxX, y: rect.maxY * 0.7),
-                           control: CGPoint(x: rect.maxX * 0.95, y: rect.height * 0.35))
-            p.addQuadCurve(to: CGPoint(x: rect.minX, y: rect.maxY * 0.7),
-                           control: CGPoint(x: rect.midX, y: rect.maxY * 1.25))
-            p.addQuadCurve(to: CGPoint(x: rect.midX, y: rect.minY),
-                           control: CGPoint(x: rect.width * 0.05, y: rect.height * 0.35))
-        }
-    }
-}
-
-// MARK: - Class pennants
-
-private struct ClassPennantRow: View {
-    var body: some View {
-        HStack(alignment: .top, spacing: 12) {
-            ClassPennant(name: "Warrior", fill: Theme.waxRed, border: Theme.waxBorder, delay: 0) {
+        HStack(spacing: 0) {
+            ClassCrest(name: "Warrior", fill: Theme.waxRed, border: Theme.waxBorder) {
                 SwordShape()
                     .stroke(Theme.cream, style: StrokeStyle(lineWidth: 2, lineJoin: .round))
-                    .frame(width: 14, height: 26)
+                    .frame(width: 15, height: 28)
                     .rotationEffect(.degrees(-45))
             }
-            ClassPennant(name: "Ranger", fill: Theme.emerald, border: Theme.emeraldBorder, delay: 0.4) {
+            ClassCrest(name: "Ranger", fill: Theme.emerald, border: Theme.emeraldBorder) {
                 Image(systemName: "leaf.fill")
             }
-            ClassPennant(name: "Monk", fill: Theme.sapphire, border: Theme.sapphireBorder, delay: 0.8) {
+            ClassCrest(name: "Monk", fill: Theme.sapphire, border: Theme.sapphireBorder) {
                 Image(systemName: "figure.mind.and.body")
             }
-            ClassPennant(name: "Paladin", fill: Theme.amethyst, border: Theme.amethystBorder, delay: 1.2) {
+            ClassCrest(name: "Paladin", fill: Theme.amethyst, border: Theme.amethystBorder) {
                 Image(systemName: "shield.fill")
+            }
+        }
+        .padding(.horizontal, onPlank ? 8 : 0)
+        .padding(.top, onPlank ? 10 : 0)
+        .padding(.bottom, onPlank ? 8 : 0)
+        .background {
+            if onPlank {
+                CartoonSurface(shape: RoundedRectangle(cornerRadius: 14), fill: Theme.darkWood,
+                               outline: Theme.darkestWood, lineWidth: 3, shadowOffset: 5)
             }
         }
         .accessibilityElement(children: .ignore)
@@ -267,121 +231,137 @@ private struct ClassPennantRow: View {
     }
 }
 
-private struct ClassPennant<Emblem: View>: View {
+private struct ClassCrest<Emblem: View>: View {
     let name: String
     let fill: Color
     let border: Color
-    let delay: Double
     @ViewBuilder let emblem: Emblem
 
-    @Environment(\.accessibilityReduceMotion) private var reduceMotion
-    @State private var sway = false
-
     var body: some View {
-        VStack(spacing: 6) {
-            ZStack {
-                Circle()
-                    .fill(border.opacity(0.45))
-                    .frame(width: 34, height: 34)
-                emblem
-                    .font(.system(size: 17, weight: .bold))
-                    .foregroundStyle(Theme.cream)
-            }
+        VStack(spacing: 4) {
+            emblem
+                .font(.system(size: 21, weight: .bold))
+                .foregroundStyle(Theme.cream)
+                .frame(width: 52, height: 52)
+                .background(CartoonSurface(shape: Circle(), fill: fill, outline: border,
+                                           lineWidth: 3, shadowOffset: 3))
             Text(name)
-                .font(.alegreyaSans(12, weight: .bold))
+                .font(.alegreyaSans(13, weight: .bold))
                 .foregroundStyle(Theme.cream)
                 .lineLimit(1)
                 .minimumScaleFactor(0.8)
         }
-        .padding(.top, 12)
-        .padding(.bottom, 24)
-        .frame(width: 62)
-        .background(CartoonShape(shape: PennantShape(), fill: fill, outline: border, shadowOffset: 4))
-        .overlay(alignment: .top) {
-            Circle()
-                .fill(Theme.brass)
-                .overlay(Circle().strokeBorder(Theme.darkestWood, lineWidth: 1.5))
-                .frame(width: 10, height: 10)
-                .offset(y: 4)
-        }
-        .rotationEffect(.degrees(sway ? 2.5 : -2.5), anchor: .top)
-        .onAppear {
-            guard !reduceMotion else { return }
-            withAnimation(.easeInOut(duration: 2.2).repeatForever(autoreverses: true).delay(delay)) {
-                sway = true
-            }
-        }
-    }
-}
-
-/// Hanging banner with a V-notch at the bottom.
-private struct PennantShape: Shape {
-    func path(in rect: CGRect) -> Path {
-        Path { p in
-            p.move(to: CGPoint(x: rect.minX, y: rect.minY))
-            p.addLine(to: CGPoint(x: rect.maxX, y: rect.minY))
-            p.addLine(to: CGPoint(x: rect.maxX, y: rect.maxY))
-            p.addLine(to: CGPoint(x: rect.midX, y: rect.maxY - 16))
-            p.addLine(to: CGPoint(x: rect.minX, y: rect.maxY))
-            p.closeSubpath()
-        }
+        .frame(maxWidth: .infinity)
     }
 }
 
 // MARK: - Menu buttons
 
-private struct TitleMenuButton: View {
+/// The one gold button: "New game" for a new player, "Continue" once there is a save.
+private struct TitlePrimaryButton: View {
     let title: String
-    var subtitle: String? = nil
+    let subtitle: String
     let systemImage: String
-    let fill: Color
-    let border: Color
-    var compact = false
     let action: () -> Void
-
-    @Environment(\.isEnabled) private var isEnabled
 
     var body: some View {
         Button(action: action) {
             HStack(spacing: 14) {
                 Image(systemName: systemImage)
-                    .font(.system(size: compact ? 15 : 18, weight: .bold))
-                    .foregroundStyle(Theme.ink)
-                    .frame(width: compact ? 32 : 38, height: compact ? 32 : 38)
-                    .background(Circle().fill(Theme.gold))
-                    .overlay(Circle().strokeBorder(border, lineWidth: 2.5))
+                    .font(.system(size: 18, weight: .heavy))
+                    .foregroundStyle(Theme.cream)
+                    .frame(width: 40, height: 40)
+                    .background(Circle().fill(Theme.waxRed))
+                    .overlay(Circle().strokeBorder(Theme.waxBorder, lineWidth: 2.5))
 
                 VStack(alignment: .leading, spacing: 0) {
                     Text(title)
-                        .font(.alegreya(compact ? 18 : 22, weight: .heavy))
-                    if let subtitle {
-                        Text(subtitle)
-                            .font(.alegreyaSans(14, weight: .medium))
-                            .opacity(0.85)
-                    }
+                        .font(.alegreya(24, weight: .heavy))
+                    Text(subtitle)
+                        .font(.alegreyaSans(14, weight: .medium))
                 }
-                .foregroundStyle(Theme.cream)
+                .foregroundStyle(Theme.ink)
 
                 Spacer(minLength: 0)
 
                 Image(systemName: "chevron.right")
                     .font(.system(size: 14, weight: .heavy))
-                    .foregroundStyle(Theme.cream.opacity(0.7))
+                    .foregroundStyle(Theme.ink)
             }
             .padding(.horizontal, 14)
-            .frame(maxWidth: .infinity, minHeight: compact ? 50 : 62)
-            .cartoonBackground(RoundedRectangle(cornerRadius: 14), fill: fill,
-                               outline: border, lineWidth: 3, shadowOffset: 5)
-            .opacity(isEnabled ? 1 : 0.55)
+            .frame(maxWidth: .infinity, minHeight: 68)
+            .cartoonBackground(RoundedRectangle(cornerRadius: 14), fill: Theme.gold,
+                               outline: Theme.outline, lineWidth: 3, shadowOffset: 5)
         }
         .buttonStyle(PressableButtonStyle())
     }
 }
 
-#Preview("With save") {
-    TitleScreenView(hasSave: true, onContinue: {}, onNewGame: {})
+private struct TitleSecondaryButton: View {
+    let title: String
+    let systemImage: String
+    let timeOfDay: TimeOfDay
+    let action: () -> Void
+
+    var body: some View {
+        Button(action: action) {
+            HStack(spacing: 10) {
+                Image(systemName: systemImage)
+                    .font(.system(size: 17, weight: .bold))
+                    .foregroundStyle(Theme.gold)
+                Text(title)
+                    .font(.alegreya(18, weight: .heavy))
+                    .foregroundStyle(Theme.cream)
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.8)
+                Spacer(minLength: 0)
+            }
+            .padding(.horizontal, 14)
+            .frame(maxWidth: .infinity, minHeight: 58)
+            .cartoonBackground(RoundedRectangle(cornerRadius: 14),
+                               fill: timeOfDay == .day ? Theme.darkWood : Theme.mountainFar,
+                               outline: timeOfDay == .day ? Theme.darkestWood : Theme.mountainNear,
+                               lineWidth: 3, shadowOffset: 5)
+        }
+        .buttonStyle(PressableButtonStyle())
+    }
 }
 
-#Preview("New player") {
-    TitleScreenView(hasSave: false, onContinue: {}, onNewGame: {})
+/// Where "Continue" will appear; shown as an empty slot until there is a save.
+private struct EmptySaveSlot: View {
+    let timeOfDay: TimeOfDay
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 0) {
+            Text("Continue")
+                .font(.alegreya(18, weight: .heavy))
+            Text("No adventure yet")
+                .font(.alegreyaSans(13, weight: .medium))
+        }
+        .foregroundStyle(Theme.cream)
+        .padding(.horizontal, 14)
+        .frame(maxWidth: .infinity, minHeight: 58, alignment: .leading)
+        .background(RoundedRectangle(cornerRadius: 14)
+            .fill(timeOfDay == .day ? Theme.grassDeep.opacity(0.6) : Theme.cream.opacity(0.08)))
+        .overlay(RoundedRectangle(cornerRadius: 14)
+            .strokeBorder(Theme.cream.opacity(0.55), style: StrokeStyle(lineWidth: 2, dash: [6, 4])))
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel("Continue. No adventure yet")
+    }
+}
+
+#Preview("Night, new player") {
+    TitleScreenView(hasSave: false, onContinue: {}, onNewGame: {}, forcedTimeOfDay: .night)
+}
+
+#Preview("Night, with save") {
+    TitleScreenView(hasSave: true, onContinue: {}, onNewGame: {}, forcedTimeOfDay: .night)
+}
+
+#Preview("Day, new player") {
+    TitleScreenView(hasSave: false, onContinue: {}, onNewGame: {}, forcedTimeOfDay: .day)
+}
+
+#Preview("Day, with save") {
+    TitleScreenView(hasSave: true, onContinue: {}, onNewGame: {}, forcedTimeOfDay: .day)
 }
