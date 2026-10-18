@@ -6,17 +6,12 @@
 import SwiftUI
 
 struct TitleScreenView: View {
-    let hasSave: Bool
-    let onContinue: () -> Void
-    let onNewGame: () -> Void
+    let onLoggedIn: () -> Void
     /// Pins the look for previews; otherwise it follows the device clock.
     var forcedTimeOfDay: TimeOfDay? = nil
 
     @State private var showingSettings = false
-    @State private var confirmingNewGame = false
-
-    // Hard-coded until the profile is loaded from SwiftData / Supabase.
-    private let saveSummary = "Level 14 Warrior · E-rank"
+    @State private var showingLogin = false
 
     var body: some View {
         // Re-evaluated every minute (and on return from background) so the scene
@@ -29,10 +24,11 @@ struct TitleScreenView: View {
         .sheet(isPresented: $showingSettings) {
             SettingsSheet()
         }
-        .confirmationDialog("Start a new adventure?", isPresented: $confirmingNewGame, titleVisibility: .visible) {
-            Button("New game", role: .destructive, action: onNewGame)
-        } message: {
-            Text("You'll pick a new class, goals and program. Your logged workouts stay on your account.")
+        .sheet(isPresented: $showingLogin) {
+            LoginSheet {
+                showingLogin = false
+                onLoggedIn()
+            }
         }
     }
 
@@ -79,26 +75,22 @@ struct TitleScreenView: View {
                 ClassCrestRow(onPlank: timeOfDay == .day)
             }
 
-            if hasSave {
-                TitlePrimaryButton(title: "Continue", subtitle: saveSummary,
-                                   systemImage: "play.fill", action: onContinue)
-            } else {
-                TitlePrimaryButton(title: "New game", subtitle: "Enter the guild gate",
-                                   systemImage: "plus", action: onNewGame)
+            Button { showingLogin = true } label: {
+                TitleButtonLabel(title: "Log in", subtitle: "Return to the guild hall", systemImage: "person.fill")
             }
+            .buttonStyle(.chunky(.gold, minHeight: 68))
 
-            HStack(spacing: 12) {
-                if hasSave {
-                    TitleSecondaryButton(title: "New game", systemImage: "plus", timeOfDay: timeOfDay) {
-                        confirmingNewGame = true
-                    }
-                } else {
-                    EmptySaveSlot(timeOfDay: timeOfDay)
-                }
-                TitleSecondaryButton(title: "Settings", systemImage: "gearshape.fill", timeOfDay: timeOfDay) {
-                    showingSettings = true
+            Button { showingSettings = true } label: {
+                HStack(spacing: 10) {
+                    Image(systemName: "gearshape.fill")
+                        .font(.system(size: 17, weight: .bold))
+                        .foregroundStyle(Theme.gold)
+                    Text("Settings")
+                        .font(.alegreya(18, weight: .heavy))
+                    Spacer(minLength: 0)
                 }
             }
+            .buttonStyle(.chunky(timeOfDay == .day ? .wood : .dusk, minHeight: 58))
         }
         .padding(.horizontal, 24)
         .padding(.top, 28)
@@ -201,20 +193,16 @@ private struct ClassCrestRow: View {
 
     var body: some View {
         HStack(spacing: 0) {
-            ClassCrest(name: "Warrior", fill: Theme.waxRed, border: Theme.waxBorder) {
-                SwordShape()
-                    .stroke(Theme.cream, style: StrokeStyle(lineWidth: 2, lineJoin: .round))
-                    .frame(width: 15, height: 28)
-                    .rotationEffect(.degrees(-45))
-            }
-            ClassCrest(name: "Ranger", fill: Theme.emerald, border: Theme.emeraldBorder) {
-                Image(systemName: "leaf.fill")
-            }
-            ClassCrest(name: "Monk", fill: Theme.sapphire, border: Theme.sapphireBorder) {
-                Image(systemName: "figure.mind.and.body")
-            }
-            ClassCrest(name: "Paladin", fill: Theme.amethyst, border: Theme.amethystBorder) {
-                Image(systemName: "shield.fill")
+            ForEach(GuildClass.allCases) { guildClass in
+                VStack(spacing: 4) {
+                    ClassEmblem(guildClass: guildClass, size: 52)
+                    Text(guildClass.name)
+                        .font(.alegreyaSans(13, weight: .bold))
+                        .foregroundStyle(Theme.cream)
+                        .lineLimit(1)
+                        .minimumScaleFactor(0.8)
+                }
+                .frame(maxWidth: .infinity)
             }
         }
         .padding(.horizontal, onPlank ? 8 : 0)
@@ -231,137 +219,42 @@ private struct ClassCrestRow: View {
     }
 }
 
-private struct ClassCrest<Emblem: View>: View {
-    let name: String
-    let fill: Color
-    let border: Color
-    @ViewBuilder let emblem: Emblem
-
-    var body: some View {
-        VStack(spacing: 4) {
-            emblem
-                .font(.system(size: 21, weight: .bold))
-                .foregroundStyle(Theme.cream)
-                .frame(width: 52, height: 52)
-                .background(CartoonSurface(shape: Circle(), fill: fill, outline: border,
-                                           lineWidth: 3, shadowOffset: 3))
-            Text(name)
-                .font(.alegreyaSans(13, weight: .bold))
-                .foregroundStyle(Theme.cream)
-                .lineLimit(1)
-                .minimumScaleFactor(0.8)
-        }
-        .frame(maxWidth: .infinity)
-    }
-}
-
 // MARK: - Menu buttons
 
-/// The one gold button: "New game" for a new player, "Continue" once there is a save.
-private struct TitlePrimaryButton: View {
+/// Icon disc, title and subtitle for the gold title-screen button.
+private struct TitleButtonLabel: View {
     let title: String
     let subtitle: String
     let systemImage: String
-    let action: () -> Void
 
     var body: some View {
-        Button(action: action) {
-            HStack(spacing: 14) {
-                Image(systemName: systemImage)
-                    .font(.system(size: 18, weight: .heavy))
-                    .foregroundStyle(Theme.cream)
-                    .frame(width: 40, height: 40)
-                    .background(Circle().fill(Theme.waxRed))
-                    .overlay(Circle().strokeBorder(Theme.waxBorder, lineWidth: 2.5))
+        HStack(spacing: 14) {
+            Image(systemName: systemImage)
+                .font(.system(size: 18, weight: .heavy))
+                .foregroundStyle(Theme.cream)
+                .frame(width: 40, height: 40)
+                .background(Circle().fill(Theme.waxRed))
+                .overlay(Circle().strokeBorder(Theme.waxBorder, lineWidth: 2.5))
 
-                VStack(alignment: .leading, spacing: 0) {
-                    Text(title)
-                        .font(.alegreya(24, weight: .heavy))
-                    Text(subtitle)
-                        .font(.alegreyaSans(14, weight: .medium))
-                }
-                .foregroundStyle(Theme.ink)
-
-                Spacer(minLength: 0)
-
-                Image(systemName: "chevron.right")
-                    .font(.system(size: 14, weight: .heavy))
-                    .foregroundStyle(Theme.ink)
-            }
-            .padding(.horizontal, 14)
-            .frame(maxWidth: .infinity, minHeight: 68)
-            .cartoonBackground(RoundedRectangle(cornerRadius: 14), fill: Theme.gold,
-                               outline: Theme.outline, lineWidth: 3, shadowOffset: 5)
-        }
-        .buttonStyle(PressableButtonStyle())
-    }
-}
-
-private struct TitleSecondaryButton: View {
-    let title: String
-    let systemImage: String
-    let timeOfDay: TimeOfDay
-    let action: () -> Void
-
-    var body: some View {
-        Button(action: action) {
-            HStack(spacing: 10) {
-                Image(systemName: systemImage)
-                    .font(.system(size: 17, weight: .bold))
-                    .foregroundStyle(Theme.gold)
+            VStack(alignment: .leading, spacing: 0) {
                 Text(title)
-                    .font(.alegreya(18, weight: .heavy))
-                    .foregroundStyle(Theme.cream)
-                    .lineLimit(1)
-                    .minimumScaleFactor(0.8)
-                Spacer(minLength: 0)
+                    .font(.alegreya(24, weight: .heavy))
+                Text(subtitle)
+                    .font(.alegreyaSans(14, weight: .medium))
             }
-            .padding(.horizontal, 14)
-            .frame(maxWidth: .infinity, minHeight: 58)
-            .cartoonBackground(RoundedRectangle(cornerRadius: 14),
-                               fill: timeOfDay == .day ? Theme.darkWood : Theme.mountainFar,
-                               outline: timeOfDay == .day ? Theme.darkestWood : Theme.mountainNear,
-                               lineWidth: 3, shadowOffset: 5)
+
+            Spacer(minLength: 0)
+
+            Image(systemName: "chevron.right")
+                .font(.system(size: 14, weight: .heavy))
         }
-        .buttonStyle(PressableButtonStyle())
     }
 }
 
-/// Where "Continue" will appear; shown as an empty slot until there is a save.
-private struct EmptySaveSlot: View {
-    let timeOfDay: TimeOfDay
-
-    var body: some View {
-        VStack(alignment: .leading, spacing: 0) {
-            Text("Continue")
-                .font(.alegreya(18, weight: .heavy))
-            Text("No adventure yet")
-                .font(.alegreyaSans(13, weight: .medium))
-        }
-        .foregroundStyle(Theme.cream)
-        .padding(.horizontal, 14)
-        .frame(maxWidth: .infinity, minHeight: 58, alignment: .leading)
-        .background(RoundedRectangle(cornerRadius: 14)
-            .fill(timeOfDay == .day ? Theme.grassDeep.opacity(0.6) : Theme.cream.opacity(0.08)))
-        .overlay(RoundedRectangle(cornerRadius: 14)
-            .strokeBorder(Theme.cream.opacity(0.55), style: StrokeStyle(lineWidth: 2, dash: [6, 4])))
-        .accessibilityElement(children: .ignore)
-        .accessibilityLabel("Continue. No adventure yet")
-    }
+#Preview("Night") {
+    TitleScreenView(onLoggedIn: {}, forcedTimeOfDay: .night)
 }
 
-#Preview("Night, new player") {
-    TitleScreenView(hasSave: false, onContinue: {}, onNewGame: {}, forcedTimeOfDay: .night)
-}
-
-#Preview("Night, with save") {
-    TitleScreenView(hasSave: true, onContinue: {}, onNewGame: {}, forcedTimeOfDay: .night)
-}
-
-#Preview("Day, new player") {
-    TitleScreenView(hasSave: false, onContinue: {}, onNewGame: {}, forcedTimeOfDay: .day)
-}
-
-#Preview("Day, with save") {
-    TitleScreenView(hasSave: true, onContinue: {}, onNewGame: {}, forcedTimeOfDay: .day)
+#Preview("Day") {
+    TitleScreenView(onLoggedIn: {}, forcedTimeOfDay: .day)
 }

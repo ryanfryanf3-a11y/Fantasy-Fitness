@@ -73,6 +73,16 @@ enum Theme {
     static let stoneLight = Color(hex: 0xDDD0B4)
     static let stoneLine = Color(hex: 0xA8977A)
     static let dirtPath = Color(hex: 0xE2C48A)
+
+    // Loot rarity (Common → Legendary)
+    static let rarityCommon = Color(hex: 0x8C7A63)
+    static let rarityCommonBorder = Color(hex: 0x4A3D2E)
+    static let rarityLegendary = Color(hex: 0xE08A1E)
+    static let rarityLegendaryBorder = Color(hex: 0x6B3A06)
+
+    // Stats
+    static let vitality = Color(hex: 0xC8682B)
+    static let vitalityBorder = Color(hex: 0x5E2C0C)
 }
 
 extension Color {
@@ -128,91 +138,5 @@ extension Font {
 
     private static func named(_ name: String, size: CGFloat, relativeTo style: Font.TextStyle, fallback: Font) -> Font {
         UIFont(name: name, size: size) != nil ? .custom(name, size: size, relativeTo: style) : fallback
-    }
-}
-
-// MARK: - Cartoon surfaces
-
-/// Flat fill, thick outline and a hard (unblurred) drop shadow.
-struct CartoonSurface<S: InsettableShape>: View {
-    let shape: S
-    let fill: Color
-    var outline: Color = Theme.outline
-    var lineWidth: CGFloat = 3
-    var shadowOffset: CGFloat = 4
-    var shadowColor: Color = Theme.darkestWood.opacity(0.55)
-
-    var body: some View {
-        ZStack {
-            shape.fill(shadowColor).offset(y: shadowOffset)
-            shape.fill(fill)
-            shape.strokeBorder(outline, lineWidth: lineWidth)
-        }
-    }
-}
-
-extension View {
-    func cartoonBackground<S: InsettableShape>(
-        _ shape: S,
-        fill: Color,
-        outline: Color = Theme.outline,
-        lineWidth: CGFloat = 3,
-        shadowOffset: CGFloat = 4
-    ) -> some View {
-        background(CartoonSurface(shape: shape, fill: fill, outline: outline,
-                                  lineWidth: lineWidth, shadowOffset: shadowOffset))
-    }
-}
-
-/// Cartoon fill for shapes that can't be inset (pennants, ribbons): centered stroke.
-struct CartoonShape<S: Shape>: View {
-    let shape: S
-    let fill: Color
-    var outline: Color = Theme.outline
-    var lineWidth: CGFloat = 3
-    var shadowOffset: CGFloat = 4
-    var shadowColor: Color = Theme.darkestWood.opacity(0.55)
-
-    var body: some View {
-        ZStack {
-            shape.fill(shadowColor).offset(y: shadowOffset)
-            shape.fill(fill)
-            shape.stroke(outline, style: StrokeStyle(lineWidth: lineWidth, lineJoin: .round))
-        }
-    }
-}
-
-// MARK: - Wood background
-
-/// Vertical wood planks with horizontal grain and dark seams.
-struct WoodBackground: View {
-    var plankCount = 4
-
-    var body: some View {
-        Canvas { context, size in
-            context.fill(Path(CGRect(origin: .zero, size: size)), with: .color(Theme.wood))
-
-            let plankWidth = size.width / CGFloat(plankCount)
-            for plank in 0..<plankCount {
-                let x = CGFloat(plank) * plankWidth
-                // Each plank gets its own grain offset so the boards don't line up.
-                var y = CGFloat((plank * 5) % 9)
-                var line = plank
-                while y < size.height {
-                    let opacity = line % 3 == 0 ? 0.10 : 0.05
-                    context.fill(Path(CGRect(x: x, y: y, width: plankWidth, height: 2)),
-                                 with: .color(.black.opacity(opacity)))
-                    y += 6 + CGFloat(line % 2)
-                    line += 1
-                }
-            }
-
-            for seam in 1..<plankCount {
-                let x = CGFloat(seam) * plankWidth - 2
-                context.fill(Path(CGRect(x: x, y: 0, width: 4, height: size.height)),
-                             with: .color(Theme.plankSeam))
-            }
-        }
-        .ignoresSafeArea()
     }
 }

@@ -7,35 +7,24 @@ import SwiftUI
 
 /// Placeholder settings (profile, sync, units). Reachable from Title and Guild Hall.
 struct SettingsSheet: View {
-    @Environment(\.dismiss) private var dismiss
+    /// Shown only once signed in (from the Guild Hall).
+    var onLogOut: (() -> Void)? = nil
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 0) {
-            HStack {
-                Text("Settings")
-                    .font(.alegreya(28, weight: .heavy))
-                    .foregroundStyle(Theme.ink)
-                Spacer()
-                Button("Done") { dismiss() }
-                    .font(.alegreya(17, weight: .heavy))
-                    .foregroundStyle(Theme.waxRed)
-                    .frame(minWidth: 44, minHeight: 44)
-            }
-
+        SheetScaffold(title: "Settings") {
             VStack(spacing: 0) {
                 row("Profile", detail: "Coming soon", systemImage: "person.fill")
                 row("Sync", detail: "Coming soon", systemImage: "arrow.triangle.2.circlepath")
                 row("Units", detail: "lb", systemImage: "scalemass.fill")
             }
-            .padding(.top, 16)
 
-            Spacer()
+            if let onLogOut {
+                Button("Log out", action: onLogOut)
+                    .buttonStyle(.chunky(.wood))
+                    .padding(.top, 28)
+            }
         }
-        .padding(24)
-        .frame(maxWidth: .infinity, maxHeight: .infinity)
-        .background(Theme.parchment)
         .presentationDetents([.medium])
-        .presentationCornerRadius(24)
     }
 
     private func row(_ title: String, detail: String, systemImage: String) -> some View {
@@ -61,5 +50,5 @@ struct SettingsSheet: View {
 }
 
 #Preview {
-    Text("Title").sheet(isPresented: .constant(true)) { SettingsSheet() }
+    Text("Title").sheet(isPresented: .constant(true)) { SettingsSheet(onLogOut: {}) }
 }

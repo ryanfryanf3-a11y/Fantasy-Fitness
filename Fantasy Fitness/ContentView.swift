@@ -12,24 +12,28 @@ enum AppTab: Hashable {
 }
 
 struct ContentView: View {
+    let onLogOut: () -> Void
+
     @State private var selectedTab: AppTab = .guildHall
 
     var body: some View {
         TabView(selection: $selectedTab) {
             Tab("Guild Hall", systemImage: "building.columns", value: .guildHall) {
-                NavigationStack { PlaceholderScreen(title: "Guild Hall") }
+                NavigationStack {
+                    GuildHallView(onOpenQuests: { selectedTab = .quests }, onLogOut: onLogOut)
+                }
             }
             Tab("Quests", systemImage: "scroll", value: .quests) {
                 NavigationStack { QuestBoardView() }
             }
             Tab("Character", systemImage: "person.crop.square", value: .character) {
-                NavigationStack { PlaceholderScreen(title: "Character") }
+                NavigationStack { CharacterSheetView() }
             }
             Tab("Dungeons", systemImage: "map", value: .dungeons) {
-                NavigationStack { PlaceholderScreen(title: "Dungeons") }
+                NavigationStack { DungeonMapView() }
             }
             Tab("Tavern", systemImage: "fork.knife", value: .tavern) {
-                NavigationStack { PlaceholderScreen(title: "Tavern") }
+                NavigationStack { TavernView() }
             }
         }
         .tint(Theme.gold)
@@ -38,25 +42,6 @@ struct ContentView: View {
     }
 }
 
-/// Stand-in for tabs that haven't been built yet.
-private struct PlaceholderScreen: View {
-    let title: String
-
-    var body: some View {
-        VStack(spacing: 8) {
-            Text(title)
-                .font(.pirata(40))
-                .foregroundStyle(Theme.gold)
-            Text("Coming soon")
-                .font(.alegreyaSans(17, weight: .medium))
-                .foregroundStyle(Theme.cream)
-        }
-        .frame(maxWidth: .infinity, maxHeight: .infinity)
-        .background(WoodBackground())
-        .toolbar(.hidden, for: .navigationBar)
-    }
-}
-
 #Preview {
-    ContentView()
+    ContentView(onLogOut: {})
 }

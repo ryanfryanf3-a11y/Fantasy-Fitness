@@ -1,0 +1,93 @@
+//
+//  ItemDetailView.swift
+//  Fantasy Fitness
+//
+
+import SwiftUI
+
+/// Item detail with an equip / compare against what's in the same slot.
+struct ItemDetailView: View {
+    let item: Item
+    let equipped: [Item]
+
+    // Local only until equip requests go through the server.
+    @State private var isEquipped: Bool
+
+    init(item: Item, equipped: [Item]) {
+        self.item = item
+        self.equipped = equipped
+        _isEquipped = State(initialValue: equipped.contains(item))
+    }
+
+    private var currentInSlot: Item? {
+        equipped.first { $0.slot == item.slot && $0 != item }
+    }
+
+    var body: some View {
+        BoardScreen(isRoot: false) {
+            ParchmentCard {
+                HStack(alignment: .top, spacing: 16) {
+                    ItemTile(item: item, size: 92, showsName: false)
+                    VStack(alignment: .leading, spacing: 6) {
+                        KickerText("\(item.slot.name) slot")
+                        Text(item.name)
+                            .font(.alegreya(26, weight: .heavy))
+                            .foregroundStyle(Theme.ink)
+                        RarityChip(rarity: item.rarity)
+                    }
+                }
+
+                Text("“\(item.flavor)”")
+                    .font(.alegreyaSans(17).italic())
+                    .foregroundStyle(Theme.inkSecondary)
+                    .padding(.top, 16)
+
+                DashedDivider().padding(.vertical, 16)
+
+                Text("Effect")
+                    .font(.alegreya(18))
+                    .foregroundStyle(Theme.ink)
+                TagChip(label: item.effect, systemImage: "sparkles")
+                    .padding(.top, 8)
+
+                if let current = currentInSlot, !isEquipped {
+                    Text("Compared with equipped")
+                        .font(.alegreya(18))
+                        .foregroundStyle(Theme.ink)
+                        .padding(.top, 18)
+                    HStack(spacing: 12) {
+                        ItemTile(item: current, size: 48, showsName: false)
+                        VStack(alignment: .leading, spacing: 2) {
+                            Text(current.name)
+                                .font(.alegreyaSans(17, weight: .bold))
+                                .foregroundStyle(Theme.ink)
+                            Text(current.effect)
+                                .font(.alegreyaSans(15))
+                                .foregroundStyle(Theme.inkSecondary)
+                        }
+                    }
+                    .padding(.top, 8)
+                }
+
+                Button {
+                    withAnimation(.snappy) { isEquipped.toggle() }
+                } label: {
+                    Label(isEquipped ? "Equipped" : "Equip", systemImage: isEquipped ? "checkmark" : "shield.lefthalf.filled")
+                }
+                .buttonStyle(.chunky(isEquipped ? .wood : .emerald))
+                .padding(.top, 22)
+
+                Text("Gear never counts toward rank exams. Exams use your real lifts.")
+                    .font(.alegreyaSans(14))
+                    .foregroundStyle(Theme.inkSecondary)
+                    .padding(.top, 12)
+            }
+        }
+    }
+}
+
+#Preview {
+    NavigationStack {
+        ItemDetailView(item: .runeAxe, equipped: PlayerProfile.sample.equipped)
+    }
+}
