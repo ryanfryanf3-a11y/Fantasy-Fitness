@@ -9,6 +9,8 @@ import SwiftUI
 
 @main
 struct Fantasy_FitnessApp: App {
+    @State private var store = GameStore()
+
     init() {
         Theme.registerFonts()
     }
@@ -16,6 +18,7 @@ struct Fantasy_FitnessApp: App {
     var body: some Scene {
         WindowGroup {
             RootView()
+                .environment(store)
         }
     }
 }

@@ -6,10 +6,7 @@
 import SwiftUI
 
 struct InventoryView: View {
-    let equipped: [Item]
-    // Hard-coded until inventory sync is wired up.
-    var items: [Item] = Item.sampleInventory
-
+    @Environment(GameStore.self) private var store
     @State private var filter: Filter = .all
 
     private enum Filter: Hashable, CaseIterable {
@@ -26,6 +23,7 @@ struct InventoryView: View {
     }
 
     private var visibleItems: [Item] {
+        let items = store.inventory
         let filtered = switch filter {
         case .all: items
         case .slot(let slot): items.filter { $0.slot == slot }
@@ -44,7 +42,7 @@ struct InventoryView: View {
                         NavigationLink(value: GearRoute.item(item)) {
                             ItemTile(item: item, size: 72)
                                 .overlay(alignment: .topTrailing) {
-                                    if equipped.contains(item) { equippedBadge }
+                                    if store.equippedIDs.contains(item.id) { equippedBadge }
                                 }
                         }
                         .buttonStyle(.plain)
@@ -68,7 +66,8 @@ struct InventoryView: View {
 
 #Preview {
     NavigationStack {
-        InventoryView(equipped: PlayerProfile.sample.equipped)
-            .gearDestinations(equipped: PlayerProfile.sample.equipped)
+        InventoryView()
+            .gearDestinations()
     }
+    .environment(GameStore.preview)
 }

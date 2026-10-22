@@ -7,8 +7,9 @@ import SwiftUI
 
 /// Character sheet → Inventory → Item detail → Equip/compare.
 struct CharacterSheetView: View {
-    // Hard-coded until profile data is wired up.
-    private let profile = PlayerProfile.sample
+    @Environment(GameStore.self) private var store
+
+    private var profile: PlayerProfile { store.player }
 
     var body: some View {
         BoardScreen {
@@ -65,7 +66,7 @@ struct CharacterSheetView: View {
                     .padding(.top, 10)
             }
         }
-        .gearDestinations(equipped: profile.equipped)
+        .gearDestinations()
     }
 }
 
@@ -107,4 +108,5 @@ private struct StatRow: View {
     NavigationStack {
         CharacterSheetView()
     }
+    .environment(GameStore.preview)
 }

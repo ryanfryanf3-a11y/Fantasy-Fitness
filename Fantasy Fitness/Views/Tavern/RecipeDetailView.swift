@@ -8,14 +8,20 @@ import SwiftUI
 struct RecipeDetailView: View {
     let recipe: Recipe
 
+    @Environment(GameStore.self) private var store
     @State private var isLogged = false
+    @State private var isLogging = false
     @State private var showingRating = false
+
+    /// The store's copy, so new ratings show after a reload.
+    private var latest: Recipe { store.recipes.first { $0.id == recipe.id } ?? recipe }
+
 
     var body: some View {
         BoardScreen(isRoot: false) {
             ParchmentScroll {
-                KickerText("\(recipe.mealType.name) · \(recipe.minutes) min · serves \(recipe.servings)")
-                Text(recipe.name)
+                KickerText("\(latest.mealType.name) · \(latest.minutes) min · serves \(latest.servings)")
+                Text(latest.name)
                     .font(.alegreya(28, weight: .heavy))
                     .foregroundStyle(Theme.ink)
                     .padding(.top, 2)
@@ -25,10 +31,10 @@ struct RecipeDetailView: View {
                     .foregroundStyle(Theme.ink)
                     .padding(.top, 16)
                 HStack(spacing: 8) {
-                    MacroTile(value: "\(recipe.macros.calories)", label: "kcal")
-                    MacroTile(value: "\(recipe.macros.protein) g", label: "protein")
-                    MacroTile(value: "\(recipe.macros.carbs) g", label: "carbs")
-                    MacroTile(value: "\(recipe.macros.fat) g", label: "fat")
+                    MacroTile(value: "\(latest.macros.calories)", label: "kcal")
+                    MacroTile(value: "\(latest.macros.protein) g", label: "protein")
+                    MacroTile(value: "\(latest.macros.carbs) g", label: "carbs")
+                    MacroTile(value: "\(latest.macros.fat) g", label: "fat")
                 }
                 .padding(.top, 8)
 
@@ -37,7 +43,7 @@ struct RecipeDetailView: View {
                     .foregroundStyle(Theme.ink)
                     .padding(.top, 18)
                 VStack(spacing: 0) {
-                    ForEach(recipe.ingredients, id: \.self) { ingredient in
+                    ForEach(latest.ingredients, id: \.self) { ingredient in
                         HStack {
                             Text(ingredient.name)
                                 .font(.alegreyaSans(17, weight: .medium))
@@ -57,28 +63,33 @@ struct RecipeDetailView: View {
                     .foregroundStyle(Theme.ink)
                     .padding(.top, 18)
                 VStack(spacing: 8) {
-                    ratingRow("Taste", recipe.ratings.taste)
-                    ratingRow("Ease", recipe.ratings.ease)
-                    ratingRow("Cost", recipe.ratings.cost)
+                    ratingRow("Taste", latest.ratings.taste)
+                    ratingRow("Ease", latest.ratings.ease)
+                    ratingRow("Cost", latest.ratings.cost)
                     HStack {
                         Text("Macro profile")
                             .font(.alegreyaSans(16, weight: .bold))
                             .foregroundStyle(Theme.ink)
                         Spacer()
-                        TagChip(label: "\(recipe.macros.profileLabel) · auto",
+                        TagChip(label: "\(latest.macros.profileLabel) · auto",
                                 fill: Theme.progressGreen.opacity(0.25), fontSize: 14)
                     }
                 }
                 .padding(.top, 8)
 
                 Button {
-                    withAnimation(.snappy) { isLogged = true }
+                    Task {
+                        isLogging = true
+                        let logged = await store.logMeal(latest)
+                        isLogging = false
+                        withAnimation(.snappy) { isLogged = logged }
+                    }
                 } label: {
                     Label(isLogged ? "Logged to today's rations" : "Log meal",
                           systemImage: isLogged ? "checkmark" : "fork.knife")
                 }
                 .buttonStyle(.chunky(isLogged ? .emerald : .wax))
-                .disabled(isLogged)
+                .disabled(isLogged || isLogging)
                 .padding(.top, 22)
 
                 Button("Rate recipe") { showingRating = true }
@@ -87,7 +98,7 @@ struct RecipeDetailView: View {
             }
         }
         .sheet(isPresented: $showingRating) {
-            RateRecipeSheet(recipe: recipe)
+            RateRecipeSheet(recipe: latest)
         }
     }
 
@@ -134,4 +145,5 @@ private struct MacroTile: View {
     NavigationStack {
         RecipeDetailView(recipe: Recipe.samples[1])
     }
+    .environment(GameStore.preview)
 }

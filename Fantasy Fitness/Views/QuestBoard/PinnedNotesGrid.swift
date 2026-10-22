@@ -7,9 +7,10 @@ import SwiftUI
 
 /// Side notes pinned below the featured quest: nutrition, sleep and guild notices.
 struct PinnedNotesGrid: View {
-    // Hard-coded until meal logs / HealthKit / exams are wired up.
-    private let rations = DailyRations.sample
+    @Environment(GameStore.self) private var store
     private let sleepGoalHours = 8
+
+    private var rations: DailyRations { store.rations }
 
     var body: some View {
         VStack(spacing: 26) {
@@ -25,7 +26,7 @@ struct PinnedNotesGrid: View {
                             .foregroundStyle(Theme.inkSecondary)
                     }
                     .padding(.top, 6)
-                    ParchmentProgressBar(progress: Double(rations.eaten.protein) / Double(rations.target.protein))
+                    ParchmentProgressBar(progress: rations.progress(\.protein))
                         .padding(.top, 8)
                 }
                 .accessibilityElement(children: .ignore)
@@ -46,8 +47,10 @@ struct PinnedNotesGrid: View {
             }
             .fixedSize(horizontal: false, vertical: true)
 
-            ExamNoticeCard(exam: .sample) {
-                // TODO: launch Workout session in exam mode
+            if let exam = store.unlockedExam {
+                ExamNoticeCard(exam: exam) {
+                    // TODO: launch Workout session in exam mode
+                }
             }
         }
     }
@@ -57,4 +60,5 @@ struct PinnedNotesGrid: View {
     PinnedNotesGrid()
         .padding()
         .background(WoodBackground())
+        .environment(GameStore.preview)
 }

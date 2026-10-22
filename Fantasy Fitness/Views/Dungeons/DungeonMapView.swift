@@ -7,17 +7,15 @@ import SwiftUI
 
 /// Dungeon map → Loadout → Battle → Loot reveal.
 struct DungeonMapView: View {
-    // Hard-coded until dungeon progress is wired up.
-    private let profile = PlayerProfile.sample
-    private let dungeons = Dungeon.sampleMap
+    @Environment(GameStore.self) private var store
 
     var body: some View {
         BoardScreen {
-            PlayerStatusBar(profile: profile)
+            PlayerStatusBar(profile: store.player)
             BoardSign(title: "Dungeons")
 
             ParchmentScroll(contentPadding: EdgeInsets(top: 24, leading: 8, bottom: 24, trailing: 8)) {
-                DungeonMap(dungeons: dungeons)
+                DungeonMap(dungeons: store.dungeons)
                     .frame(height: 460)
             }
 
@@ -30,9 +28,9 @@ struct DungeonMapView: View {
             }
         }
         .navigationDestination(for: Dungeon.self) { dungeon in
-            LoadoutView(dungeon: dungeon, profile: profile)
+            LoadoutView(dungeon: dungeon)
         }
-        .gearDestinations(equipped: profile.equipped)
+        .gearDestinations()
     }
 }
 
@@ -164,4 +162,5 @@ private struct DungeonNode: View {
     NavigationStack {
         DungeonMapView()
     }
+    .environment(GameStore.preview)
 }

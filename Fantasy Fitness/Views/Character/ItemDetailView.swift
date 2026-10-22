@@ -8,19 +8,14 @@ import SwiftUI
 /// Item detail with an equip / compare against what's in the same slot.
 struct ItemDetailView: View {
     let item: Item
-    let equipped: [Item]
 
-    // Local only until equip requests go through the server.
-    @State private var isEquipped: Bool
+    @Environment(GameStore.self) private var store
+    @State private var isSaving = false
 
-    init(item: Item, equipped: [Item]) {
-        self.item = item
-        self.equipped = equipped
-        _isEquipped = State(initialValue: equipped.contains(item))
-    }
+    private var isEquipped: Bool { store.equippedIDs.contains(item.id) }
 
     private var currentInSlot: Item? {
-        equipped.first { $0.slot == item.slot && $0 != item }
+        store.player.equipped.first { $0.slot == item.slot && $0 != item }
     }
 
     var body: some View {
@@ -70,11 +65,16 @@ struct ItemDetailView: View {
                 }
 
                 Button {
-                    withAnimation(.snappy) { isEquipped.toggle() }
+                    Task {
+                        isSaving = true
+                        if isEquipped { await store.unequip(item) } else { await store.equip(item) }
+                        isSaving = false
+                    }
                 } label: {
-                    Label(isEquipped ? "Equipped" : "Equip", systemImage: isEquipped ? "checkmark" : "shield.lefthalf.filled")
+                    Label(isEquipped ? "Unequip" : "Equip", systemImage: isEquipped ? "xmark" : "shield.lefthalf.filled")
                 }
                 .buttonStyle(.chunky(isEquipped ? .wood : .emerald))
+                .disabled(isSaving)
                 .padding(.top, 22)
 
                 Text("Gear never counts toward rank exams. Exams use your real lifts.")
@@ -88,6 +88,7 @@ struct ItemDetailView: View {
 
 #Preview {
     NavigationStack {
-        ItemDetailView(item: .runeAxe, equipped: PlayerProfile.sample.equipped)
+        ItemDetailView(item: .runeAxe)
     }
+    .environment(GameStore.preview)
 }

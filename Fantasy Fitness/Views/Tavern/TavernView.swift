@@ -18,22 +18,20 @@ struct TavernView: View {
         }
     }
 
-    // Hard-coded until meal logs and the recipe catalog are wired up.
-    private let rations = DailyRations.sample
-    private let recipes = Recipe.samples
+    @Environment(GameStore.self) private var store
 
     @State private var shelf: Shelf = .library
     @State private var showingCreate = false
 
     private var visibleRecipes: [Recipe] {
-        shelf == .mine ? recipes.filter(\.isMine) : recipes
+        shelf == .mine ? store.recipes.filter(\.isMine) : store.recipes
     }
 
     var body: some View {
         BoardScreen {
             BoardSign(title: "Tavern")
 
-            RationsCard(rations: rations)
+            RationsCard(rations: store.rations)
 
             WoodSegmentedPicker(options: Shelf.allCases, selection: $shelf, title: \.title)
                 .padding(.top, 4)
@@ -130,9 +128,13 @@ private struct RecipeCard: View {
             }
 
             FlowLayout(spacing: 8) {
-                TagChip(label: recipe.macros.profileLabel, fill: Theme.progressGreen.opacity(0.25), fontSize: 14)
-                TagChip(label: "\(recipe.macros.protein) g protein", fontSize: 14)
-                TagChip(label: "\(recipe.macros.calories) kcal", fontSize: 14)
+                if recipe.macros.calories > 0 {
+                    TagChip(label: recipe.macros.profileLabel, fill: Theme.progressGreen.opacity(0.25), fontSize: 14)
+                    TagChip(label: "\(recipe.macros.protein) g protein", fontSize: 14)
+                    TagChip(label: "\(recipe.macros.calories) kcal", fontSize: 14)
+                } else {
+                    TagChip(label: "Macros pending", fontSize: 14)
+                }
             }
             .padding(.top, 10)
 
@@ -152,4 +154,5 @@ private struct RecipeCard: View {
     NavigationStack {
         TavernView()
     }
+    .environment(GameStore.preview)
 }

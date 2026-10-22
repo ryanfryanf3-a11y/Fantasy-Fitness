@@ -30,7 +30,7 @@ struct Item: Identifiable, Hashable {
     let flavor: String
 }
 
-// MARK: - Hard-coded sample data
+// MARK: - Sample data (previews and offline demo mode)
 
 extension Item {
     static let ironHelm = Item(id: "iron-helm", name: "Iron Helm", slot: .head, rarity: .common,

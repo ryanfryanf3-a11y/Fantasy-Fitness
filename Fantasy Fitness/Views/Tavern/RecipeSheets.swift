@@ -9,9 +9,11 @@ import SwiftUI
 struct RateRecipeSheet: View {
     let recipe: Recipe
 
+    @Environment(GameStore.self) private var store
     @State private var taste = 4
     @State private var ease = 4
     @State private var cost = 4
+    @State private var isSaving = false
     @Environment(\.dismiss) private var dismiss
 
     var body: some View {
@@ -32,8 +34,14 @@ struct RateRecipeSheet: View {
                 .foregroundStyle(Theme.inkSecondary)
                 .padding(.top, 16)
 
-            // TODO: submit to recipe_ratings
-            Button("Submit rating") { dismiss() }
+            Button("Submit rating") {
+                Task {
+                    isSaving = true
+                    if await store.rate(recipe, taste: taste, ease: ease, cost: cost) { dismiss() }
+                    isSaving = false
+                }
+            }
+            .disabled(isSaving)
                 .buttonStyle(.chunky(.wax))
                 .padding(.top, 22)
         }
@@ -53,6 +61,8 @@ struct RateRecipeSheet: View {
 
 /// New recipe with ingredients; macros are filled in automatically once food data is connected.
 struct CreateRecipeSheet: View {
+    @Environment(GameStore.self) private var store
+    @State private var isSaving = false
     @State private var name = ""
     @State private var mealType: MealType = .dinner
     @State private var ingredients: [Ingredient] = []
@@ -109,24 +119,31 @@ struct CreateRecipeSheet: View {
             .disabled(ingredientName.isEmpty)
             .padding(.top, 12)
 
-            Text("Macros are calculated automatically from your ingredients.")
+            Text("Macros will be calculated from your ingredients once food data is connected.")
                 .font(.alegreyaSans(14))
                 .foregroundStyle(Theme.inkSecondary)
                 .padding(.top, 16)
 
-            // TODO: save to recipes / recipe_ingredients
-            Button("Save recipe") { dismiss() }
+            Button("Save recipe") {
+                Task {
+                    isSaving = true
+                    if await store.createRecipe(name: name, mealType: mealType, ingredients: ingredients) {
+                        dismiss()
+                    }
+                    isSaving = false
+                }
+            }
                 .buttonStyle(.chunky(.emerald))
-                .disabled(name.isEmpty || ingredients.isEmpty)
+                .disabled(name.isEmpty || ingredients.isEmpty || isSaving)
                 .padding(.top, 18)
         }
     }
 }
 
 #Preview("Rate") {
-    Text("Tavern").sheet(isPresented: .constant(true)) { RateRecipeSheet(recipe: Recipe.samples[0]) }
+    Text("Tavern").sheet(isPresented: .constant(true)) { RateRecipeSheet(recipe: Recipe.samples[0]).environment(GameStore.preview) }
 }
 
 #Preview("Create") {
-    Text("Tavern").sheet(isPresented: .constant(true)) { CreateRecipeSheet() }
+    Text("Tavern").sheet(isPresented: .constant(true)) { CreateRecipeSheet().environment(GameStore.preview) }
 }

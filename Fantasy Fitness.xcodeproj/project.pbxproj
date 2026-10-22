@@ -6,6 +6,10 @@
 	objectVersion = 77;
 	objects = {
 
+/* Begin PBXBuildFile section */
+		50A4E902306D9E5700B4F8C2 /* Supabase in Frameworks */ = {isa = PBXBuildFile; productRef = 50A4E901306D9E5700B4F8C2 /* Supabase */; };
+/* End PBXBuildFile section */
+
 /* Begin PBXFileReference section */
 		50A4E808306D9E5700B4F8C2 /* Fantasy Fitness.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = "Fantasy Fitness.app"; sourceTree = BUILT_PRODUCTS_DIR; };
 /* End PBXFileReference section */
@@ -23,6 +27,7 @@
 			isa = PBXFrameworksBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				50A4E902306D9E5700B4F8C2 /* Supabase in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -65,6 +70,7 @@
 			);
 			name = "Fantasy Fitness";
 			packageProductDependencies = (
+				50A4E901306D9E5700B4F8C2 /* Supabase */,
 			);
 			productName = "Fantasy Fitness";
 			productReference = 50A4E808306D9E5700B4F8C2 /* Fantasy Fitness.app */;
@@ -94,6 +100,9 @@
 			);
 			mainGroup = 50A4E7FF306D9E5700B4F8C2;
 			minimizedProjectReferenceProxies = 1;
+			packageReferences = (
+				50A4E900306D9E5700B4F8C2 /* XCRemoteSwiftPackageReference "supabase-swift" */,
+			);
 			preferredProjectObjectVersion = 77;
 			productRefGroup = 50A4E809306D9E5700B4F8C2 /* Products */;
 			projectDirPath = "";
@@ -332,6 +341,25 @@
 			defaultConfigurationName = Release;
 		};
 /* End XCConfigurationList section */
+
+/* Begin XCRemoteSwiftPackageReference section */
+		50A4E900306D9E5700B4F8C2 /* XCRemoteSwiftPackageReference "supabase-swift" */ = {
+			isa = XCRemoteSwiftPackageReference;
+			repositoryURL = "https://github.com/supabase/supabase-swift";
+			requirement = {
+				kind = upToNextMajorVersion;
+				minimumVersion = 2.0.0;
+			};
+		};
+/* End XCRemoteSwiftPackageReference section */
+
+/* Begin XCSwiftPackageProductDependency section */
+		50A4E901306D9E5700B4F8C2 /* Supabase */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = 50A4E900306D9E5700B4F8C2 /* XCRemoteSwiftPackageReference "supabase-swift" */;
+			productName = Supabase;
+		};
+/* End XCSwiftPackageProductDependency section */
 	};
 	rootObject = 50A4E800306D9E5700B4F8C2 /* Project object */;
 }

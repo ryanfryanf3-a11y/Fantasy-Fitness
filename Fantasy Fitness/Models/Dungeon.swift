@@ -25,7 +25,7 @@ struct Dungeon: Identifiable, Hashable {
     let mapPosition: CGPoint
 }
 
-// MARK: - Hard-coded sample data
+// MARK: - Sample data (previews and offline demo mode)
 
 extension Dungeon {
     static let sampleMap: [Dungeon] = [

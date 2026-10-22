@@ -19,7 +19,7 @@ struct ExamNoticeCard: View {
                     Text(exam.standard)
                         .font(.alegreyaSans(16, weight: .bold))
                         .foregroundStyle(Theme.ink)
-                    Text("Target \(exam.targetWeight) lb")
+                    Text(exam.targetWeight.map { "Target \($0) lb" } ?? "Add your bodyweight to see the target")
                         .font(.alegreyaSans(14, weight: .medium))
                         .foregroundStyle(Theme.inkSecondary)
                 }

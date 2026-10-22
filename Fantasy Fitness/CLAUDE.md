@@ -15,7 +15,7 @@ A SwiftUI iOS app that gamifies weightlifting and exercise as a fantasy RPG. The
 ## Tech stack
 
 - Xcode project from the **App** template, SwiftUI, Swift.
-- Local storage: **SwiftData** (offline-first; gyms have bad signal). Keep a pending-uploads queue and sync when online.
+- Local storage: **SwiftData** (offline-first; gyms have bad signal). Keep a pending-uploads queue and sync when online. *(Not built yet; the app talks to Supabase directly for now.)*
 - Backend: **Supabase** (Postgres, Auth, Storage, Realtime, Edge Functions) via `supabase-swift`.
   - Auth: Sign in with Apple (required if offering other third-party logins), email, Google.
   - Row-level security on every table. Users may insert workouts but may NOT write their own XP, stats, or inventory.
@@ -25,16 +25,38 @@ A SwiftUI iOS app that gamifies weightlifting and exercise as a fantasy RPG. The
 - HealthKit integration for cardio and sleep. Follow Apple's rules: no ad use of health data, clear privacy policy; prefer keeping raw health data on-device.
 - Game visuals (battles) later via SpriteKit embedded with SwiftUI `SpriteView`.
 
-## Starting database schema
+## Backend (Supabase)
 
-- `profiles`: user id, display name, class, level, rank, bodyweight
-- `stats`: strength, endurance, speed, agility, vitality (per user)
-- `workouts`, `workout_sets`: exercise, weight, reps, timestamps
-- `quests`, `quest_progress`
-- `items` (catalog), `inventory` (owned, equipped)
-- `recipes`, `recipe_ingredients`, `recipe_ratings`, `meal_logs`
-- `guilds`, `guild_members`
-- `exam_attempts`: lift, result, video path, verification status
+Supabase is the backend. Everything the game needs is stored there; the app has no local database yet (the SwiftData offline queue is still to come).
+
+**Files**
+- `supabase/migrations/20261022000000_initial_schema.sql`: tables, row-level security, column grants, triggers, server functions, storage buckets.
+- `supabase/migrations/20261022000100_catalog_data.sql`: items, dungeons, rank exams, quest templates, starter recipes. Safe to re-run.
+- `Fantasy Fitness/Config/Secrets.plist` (gitignored, never commit): `SUPABASE_URL` and `SUPABASE_ANON_KEY`. Copy `Secrets.example.plist` from the repo root to create it. Only the anon/publishable key goes in the app, never the service-role key.
+- `Fantasy Fitness/Services/`: `SupabaseConfig.swift` (reads the secrets, builds the client), `Rows.swift` (Codable row types and mapping to models), `GameStore.swift` (the single `@Observable` store all views read from via `@Environment(GameStore.self)`).
+- Without a valid `Secrets.plist` the app runs in **offline demo mode** on the sample data in `Models/`; previews use `GameStore.preview`.
+
+**Schema**
+- Players: `profiles` (name, class, rank, xp, generated `level` / `level_start_xp` / `next_level_xp`, energy, bodyweight, macro targets with a 1200 kcal floor, `has_completed_onboarding`), `stats`, `inventory` (one row per owned item, `equipped`).
+- Raw activity (client writes): `workouts`, `workout_sets`, `cardio_logs`, `sleep_logs` (nightly hours only; raw HealthKit stays on device), `meal_logs`. Dates are the player's local date sent by the app.
+- Quests: `quest_templates` (server-only), per-player `quests` and `quest_objectives` (metric, target, progress, is_complete).
+- Catalogs: `items`, `dungeons`, `rank_exams`. Runs: `dungeon_runs`. Exams: `exam_attempts`.
+- Tavern: `recipes`, `recipe_ingredients`, `recipe_ratings` (taste / ease / cost), `recipe_summaries` view.
+- `guilds`, `guild_members` (tables only so far). Storage buckets: `avatars`, `recipe-photos`, `lift-videos` (each user writes only under a folder named with their user id).
+
+**Rules the database enforces**
+- RLS on every table; players read only their own rows (catalogs and public recipes are shared).
+- Column-level grants: players can insert raw data and edit a few profile fields (name, class, bodyweight, macro targets). XP, level, rank, Energy, stats, inventory and quest progress are written only by `security definer` functions.
+- New sign-ups get a profile, stats and starter gear from a trigger on `auth.users`.
+- Client RPCs: `complete_onboarding`, `generate_quests(p_today)`, `complete_workout`, `equip_item` / `unequip_item`, `start_dungeon_run` / `finish_dungeon_run`, `unlocked_exams`, `create_recipe`. Logging meals, sleep and cardio recomputes quest progress via triggers.
+- Stat formulas are placeholders (Strength from best Epley 1RM / bodyweight, Endurance from cardio minutes, Vitality from 7h+ nights) and only ever go up.
+- Known gap: dungeon battles are simulated on the device and the client reports victory. Move resolution server-side before anything competitive.
+
+**Setup for a new project**
+1. Create a project at supabase.com.
+2. Run both migration files in order (SQL Editor, or `supabase link` + `supabase db push`).
+3. Put the Project URL and anon key in `Config/Secrets.plist`.
+4. Auth providers: Email is on by default. Apple needs the bundle ID `com.appteamcarolina.Fantasy-Fitness` under Client IDs plus the Sign in with Apple capability in Xcode. Google needs a Google Cloud OAuth client. Add `fantasyfitness://login-callback` under Authentication → URL Configuration → Redirect URLs.
 
 ## Game systems
 

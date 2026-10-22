@@ -10,12 +10,11 @@ struct GuildHallView: View {
     let onOpenQuests: () -> Void
     let onLogOut: () -> Void
 
-    // Hard-coded until profile / quest data is wired up.
-    private let profile = PlayerProfile.sample
-    private let rations = DailyRations.sample
-    private let todaysQuest = Quest.sampleDaily
-
+    @Environment(GameStore.self) private var store
     @State private var showingSettings = false
+
+    private var profile: PlayerProfile { store.player }
+    private var rations: DailyRations { store.rations }
 
     var body: some View {
         BoardScreen {
@@ -29,15 +28,17 @@ struct GuildHallView: View {
                     .buttonStyle(.plain)
             }
             ParchmentCard(padding: 16) {
-                TodayRow(palette: .wax, systemImage: "dumbbell.fill",
-                         title: todaysQuest.title,
-                         detail: "Daily · \(todaysQuest.completedCount) of \(todaysQuest.objectives.count) lifts",
-                         progress: todaysQuest.progress)
-                DashedDivider()
+                if let todaysQuest = store.quests[.daily] {
+                    TodayRow(palette: .wax, systemImage: "dumbbell.fill",
+                             title: todaysQuest.title,
+                             detail: "Daily · \(todaysQuest.completedCount) of \(todaysQuest.objectives.count) done",
+                             progress: todaysQuest.progress)
+                    DashedDivider()
+                }
                 TodayRow(palette: .emerald, systemImage: "fork.knife",
                          title: "Ration duty",
                          detail: "Protein \(rations.eaten.protein) / \(rations.target.protein) g",
-                         progress: Double(rations.eaten.protein) / Double(rations.target.protein))
+                         progress: rations.progress(\.protein))
                 DashedDivider()
                 TodayRow(palette: .sapphire, systemImage: "moon.zzz.fill",
                          title: "Rest at the inn",
@@ -49,10 +50,16 @@ struct GuildHallView: View {
             EnergyCard(energy: profile.energy, maxEnergy: profile.maxEnergy)
 
             BoardSectionHeader(title: "Notices")
-            ExamNoticeCard(exam: .sample, rotation: 0.8) {
-                // TODO: launch Workout session in exam mode
+            if let exam = store.unlockedExam {
+                ExamNoticeCard(exam: exam, rotation: 0.8) {
+                    // TODO: launch Workout session in exam mode
+                }
+                .padding(.top, 8)
+            } else {
+                ParchmentCard(padding: 16) {
+                    NoteHeading(title: "No notices", subtitle: "Keep training to unlock your next rank exam.")
+                }
             }
-            .padding(.top, 8)
 
             Button { showingSettings = true } label: {
                 Label("Settings", systemImage: "gearshape.fill")
@@ -83,7 +90,7 @@ struct GuildHallView: View {
             }
             ParchmentProgressBar(progress: profile.levelProgress, tint: Theme.gold)
                 .padding(.top, 14)
-            Text("\(profile.xp.formatted()) / \(profile.xpForNextLevel.formatted()) XP to level \(profile.level + 1)")
+            Text("\(profile.xp.formatted()) / \(profile.nextLevelXP.formatted()) XP to level \(profile.level + 1)")
                 .font(.alegreyaSans(15, weight: .medium))
                 .foregroundStyle(Theme.inkSecondary)
                 .padding(.top, 6)
@@ -155,4 +162,5 @@ private struct EnergyCard: View {
     NavigationStack {
         GuildHallView(onOpenQuests: {}, onLogOut: {})
     }
+    .environment(GameStore.preview)
 }

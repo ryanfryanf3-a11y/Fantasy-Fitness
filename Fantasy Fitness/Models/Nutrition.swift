@@ -55,9 +55,14 @@ struct Recipe: Identifiable, Hashable {
 struct DailyRations {
     let eaten: Macros
     let target: Macros
+
+    /// 0…1 share of a target, safe when the target hasn't loaded yet.
+    func progress(_ macro: KeyPath<Macros, Int>) -> Double {
+        target[keyPath: macro] > 0 ? Double(eaten[keyPath: macro]) / Double(target[keyPath: macro]) : 0
+    }
 }
 
-// MARK: - Hard-coded sample data
+// MARK: - Sample data (previews and offline demo mode)
 
 extension DailyRations {
     static let sample = DailyRations(

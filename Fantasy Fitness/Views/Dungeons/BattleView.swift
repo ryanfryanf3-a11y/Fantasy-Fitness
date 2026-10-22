@@ -5,34 +5,41 @@
 
 import SwiftUI
 
-/// Turn-based stand-in for the SpriteKit battle. Damage numbers are hard-coded;
-/// the real outcome and loot will come from the server.
+/// Turn-based stand-in for the SpriteKit battle. The fight plays out on the device;
+/// the result is reported to the server, which decides XP and loot.
 struct BattleView: View {
     let dungeon: Dungeon
-    let profile: PlayerProfile
+    let runID: UUID
     let onFinish: () -> Void
 
-    private enum Phase { case fighting, victory, defeat }
+    private enum Phase { case fighting, claiming, victory(LootDrop), defeat }
+
+    @Environment(GameStore.self) private var store
 
     @State private var bossHealth: Int
     @State private var playerHealth = 100
     @State private var phase: Phase = .fighting
     @State private var log = "The boss stirs. Make your move."
 
-    private var attack: Int { (profile.stats[.strength] ?? 0) / 2 + 5 }
+    private var profile: PlayerProfile { store.player }
+    private var attack: Int { (profile.stats[.strength] ?? 0) / 2 + 12 }
+    private var isOver: Bool {
+        if case .fighting = phase { return false }
+        return true
+    }
 
-    init(dungeon: Dungeon, profile: PlayerProfile, onFinish: @escaping () -> Void) {
+    init(dungeon: Dungeon, runID: UUID, onFinish: @escaping () -> Void) {
         self.dungeon = dungeon
-        self.profile = profile
+        self.runID = runID
         self.onFinish = onFinish
         _bossHealth = State(initialValue: dungeon.bossHealth)
     }
 
     var body: some View {
         switch phase {
-        case .victory:
-            LootRevealView(loot: .sampleDungeon, onCollect: onFinish)
-        case .fighting, .defeat:
+        case .victory(let loot):
+            LootRevealView(loot: loot, onCollect: onFinish)
+        case .fighting, .claiming, .defeat:
             arena
         }
     }
@@ -40,7 +47,12 @@ struct BattleView: View {
     private var arena: some View {
         VStack(spacing: 20) {
             HStack {
-                WoodIconButton(systemImage: "xmark", accessibilityLabel: "Flee", action: onFinish)
+                WoodIconButton(systemImage: "xmark", accessibilityLabel: "Flee") {
+                    Task {
+                        if !isOver { _ = await store.finishRun(runID, victory: false) }
+                        onFinish()
+                    }
+                }
                 Spacer()
                 Text(dungeon.name)
                     .font(.pirata(30))
@@ -73,9 +85,14 @@ struct BattleView: View {
 
             Spacer(minLength: 0)
 
-            if phase == .defeat {
+            if case .defeat = phase {
                 Button("Return to the inn", action: onFinish)
                     .buttonStyle(.chunky(.wood))
+            } else if case .claiming = phase {
+                ProgressView("Claiming spoils…")
+                    .tint(Theme.gold)
+                    .foregroundStyle(Theme.cream)
+                    .frame(minHeight: 54)
             } else {
                 HStack(spacing: 12) {
                     Button { takeTurn(guarding: false) } label: {
@@ -120,7 +137,8 @@ struct BattleView: View {
                 bossHealth = max(bossHealth - attack, 0)
             }
             if bossHealth == 0 {
-                phase = .victory
+                phase = .claiming
+                Task { await claimVictory() }
                 return
             }
             let hit = guarding ? 4 : 12
@@ -131,11 +149,22 @@ struct BattleView: View {
             if playerHealth == 0 {
                 phase = .defeat
                 log = "You fall back to rest. No stats lost, so train up and try again."
+                Task { _ = await store.finishRun(runID, victory: false) }
             }
+        }
+    }
+
+    private func claimVictory() async {
+        if let loot = await store.finishRun(runID, victory: true) {
+            withAnimation(.snappy) { phase = .victory(loot) }
+        } else {
+            log = "The spoils couldn't be claimed. Check your connection."
+            phase = .defeat
         }
     }
 }
 
 #Preview {
-    BattleView(dungeon: Dungeon.sampleMap[1], profile: .sample, onFinish: {})
+    BattleView(dungeon: Dungeon.sampleMap[1], runID: UUID(), onFinish: {})
+        .environment(GameStore.preview)
 }

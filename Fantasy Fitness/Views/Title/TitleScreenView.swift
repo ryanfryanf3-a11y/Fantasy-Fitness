@@ -10,8 +10,10 @@ struct TitleScreenView: View {
     /// Pins the look for previews; otherwise it follows the device clock.
     var forcedTimeOfDay: TimeOfDay? = nil
 
+    @Environment(GameStore.self) private var store
     @State private var showingSettings = false
     @State private var showingLogin = false
+    @State private var isResuming = false
 
     var body: some View {
         // Re-evaluated every minute (and on return from background) so the scene
@@ -29,6 +31,17 @@ struct TitleScreenView: View {
                 showingLogin = false
                 onLoggedIn()
             }
+        }
+    }
+
+    /// Returning players with a saved session go straight in; everyone else sees the sheet.
+    private func logIn() async {
+        isResuming = true
+        defer { isResuming = false }
+        if await store.resumeSession() {
+            onLoggedIn()
+        } else {
+            showingLogin = true
         }
     }
 
@@ -75,10 +88,13 @@ struct TitleScreenView: View {
                 ClassCrestRow(onPlank: timeOfDay == .day)
             }
 
-            Button { showingLogin = true } label: {
+            Button {
+                Task { await logIn() }
+            } label: {
                 TitleButtonLabel(title: "Log in", subtitle: "Return to the guild hall", systemImage: "person.fill")
             }
             .buttonStyle(.chunky(.gold, minHeight: 68))
+            .disabled(isResuming)
 
             Button { showingSettings = true } label: {
                 HStack(spacing: 10) {
@@ -253,8 +269,10 @@ private struct TitleButtonLabel: View {
 
 #Preview("Night") {
     TitleScreenView(onLoggedIn: {}, forcedTimeOfDay: .night)
+        .environment(GameStore.preview)
 }
 
 #Preview("Day") {
     TitleScreenView(onLoggedIn: {}, forcedTimeOfDay: .day)
+        .environment(GameStore.preview)
 }

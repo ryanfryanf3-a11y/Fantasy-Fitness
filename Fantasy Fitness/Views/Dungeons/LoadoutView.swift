@@ -8,10 +8,13 @@ import SwiftUI
 /// Review the dungeon and your gear before spending Energy.
 struct LoadoutView: View {
     let dungeon: Dungeon
-    let profile: PlayerProfile
 
-    @State private var showingBattle = false
+    @Environment(GameStore.self) private var store
     @Environment(\.dismiss) private var dismiss
+    @State private var activeRun: ActiveRun?
+    @State private var isStarting = false
+
+    private var profile: PlayerProfile { store.player }
 
     private var canEnter: Bool { profile.energy >= dungeon.energyCost }
 
@@ -76,12 +79,19 @@ struct LoadoutView: View {
             }
 
             Button {
-                showingBattle = true
+                Task {
+                    isStarting = true
+                    // The server checks rank and Energy and spends it before the fight starts.
+                    if let runID = await store.startRun(in: dungeon) {
+                        activeRun = ActiveRun(id: runID)
+                    }
+                    isStarting = false
+                }
             } label: {
                 Label("Enter dungeon", systemImage: "door.left.hand.open")
             }
             .buttonStyle(.chunky(.wax, minHeight: 58, fontSize: 21))
-            .disabled(!canEnter)
+            .disabled(!canEnter || isStarting)
             .padding(.top, 8)
 
             if !canEnter {
@@ -91,17 +101,22 @@ struct LoadoutView: View {
                     .multilineTextAlignment(.center)
             }
         }
-        .fullScreenCover(isPresented: $showingBattle) {
-            BattleView(dungeon: dungeon, profile: profile) {
-                showingBattle = false
+        .fullScreenCover(item: $activeRun) { run in
+            BattleView(dungeon: dungeon, runID: run.id) {
+                activeRun = nil
                 dismiss()
             }
         }
     }
 }
 
+private struct ActiveRun: Identifiable {
+    let id: UUID
+}
+
 #Preview {
     NavigationStack {
-        LoadoutView(dungeon: Dungeon.sampleMap[1], profile: .sample)
+        LoadoutView(dungeon: Dungeon.sampleMap[1])
     }
+    .environment(GameStore.preview)
 }

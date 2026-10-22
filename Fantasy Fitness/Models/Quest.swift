@@ -29,13 +29,14 @@ enum QuestKind: String, CaseIterable, Identifiable {
 
 /// Objectives complete automatically from logged data; the UI never toggles them.
 struct QuestObjective: Identifiable {
-    let id = UUID()
+    var id = UUID().uuidString
     let name: String
     let detail: String
     let isComplete: Bool
 }
 
-struct Quest {
+struct Quest: Identifiable {
+    var id = UUID().uuidString
     let kind: QuestKind
     let arc: String
     let title: String
@@ -51,7 +52,7 @@ struct Quest {
     var kicker: String { "\(kind.title) quest · \(arc)" }
 }
 
-// MARK: - Hard-coded sample data (replace with SwiftData / Supabase)
+// MARK: - Sample data (previews and offline demo mode)
 
 extension Quest {
     static let sampleDaily = Quest(

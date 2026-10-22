@@ -8,18 +8,24 @@ import SwiftUI
 struct QuestBoardView: View {
     @State private var selectedKind: QuestKind = .daily
 
-    // Hard-coded until profile / quest data is wired up.
-    private let profile = PlayerProfile.sample
+    @Environment(GameStore.self) private var store
 
     var body: some View {
         BoardScreen {
-            PlayerStatusBar(profile: profile)
+            PlayerStatusBar(profile: store.player)
             BoardSign(title: "Quest Board")
             WoodSegmentedPicker(options: QuestKind.allCases, selection: $selectedKind, title: \.title)
-            QuestScroll(quest: .sample(for: selectedKind)) {
-                // TODO: present Workout session via .fullScreenCover
+            if let quest = store.quests[selectedKind] {
+                QuestScroll(quest: quest) {
+                    // TODO: present Workout session via .fullScreenCover
+                }
+                .padding(.top, 4)
+            } else {
+                ParchmentCard {
+                    NoteHeading(title: "No \(selectedKind.title.lowercased()) quest posted",
+                                subtitle: "New quests are posted each day and week.")
+                }
             }
-            .padding(.top, 4)
             PinnedNotesGrid()
                 .padding(.top, 8)
         }
@@ -144,4 +150,5 @@ private struct ObjectiveRow: View {
     NavigationStack {
         QuestBoardView()
     }
+    .environment(GameStore.preview)
 }

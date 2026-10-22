@@ -5,12 +5,17 @@
 
 import SwiftUI
 
-/// First-login setup. Class choice is live; goals and program selection are still to come.
+/// First-login setup, saved to the player's Supabase profile. Goals and program
+/// selection are still to come.
 struct OnboardingView: View {
     let onFinish: () -> Void
     let onBack: () -> Void
 
+    @Environment(GameStore.self) private var store
     @State private var selectedClass: GuildClass = .warrior
+    @State private var displayName = ""
+    @State private var bodyweight = ""
+    @State private var isSaving = false
 
     var body: some View {
         BoardScreen {
@@ -22,7 +27,21 @@ struct OnboardingView: View {
             BoardSign(title: "Join the Guild", fontSize: 40)
 
             ParchmentCard {
-                KickerText("Step 1 of 3 · Choose your class")
+                KickerText("Your adventurer")
+                VStack(spacing: 14) {
+                    ParchmentField(title: "Name", text: $displayName, prompt: store.player.displayName,
+                                   contentType: .nickname)
+                    ParchmentField(title: "Bodyweight (lb, optional)", text: $bodyweight, prompt: "180",
+                                   keyboard: .decimalPad)
+                }
+                .padding(.top, 10)
+                Text("Rank exams are set relative to bodyweight. It stays private.")
+                    .font(.alegreyaSans(14))
+                    .foregroundStyle(Theme.inkSecondary)
+                    .padding(.top, 6)
+
+                KickerText("Choose your class")
+                    .padding(.top, 20)
                 Text("Your class sets your default routine and bonus XP.")
                     .font(.alegreyaSans(17))
                     .foregroundStyle(Theme.inkSecondary)
@@ -42,10 +61,31 @@ struct OnboardingView: View {
                     .foregroundStyle(Theme.inkSecondary)
                     .padding(.top, 16)
 
-                Button("Enter the Guild Hall", action: onFinish)
-                    .buttonStyle(.chunky(.emerald))
-                    .padding(.top, 16)
+                Button {
+                    Task { await save() }
+                } label: {
+                    if isSaving {
+                        ProgressView().tint(Theme.cream)
+                    } else {
+                        Text("Enter the Guild Hall")
+                    }
+                }
+                .buttonStyle(.chunky(.emerald))
+                .disabled(isSaving)
+                .padding(.top, 16)
             }
+        }
+    }
+}
+
+extension OnboardingView {
+    private func save() async {
+        isSaving = true
+        defer { isSaving = false }
+        let weight = Double(bodyweight.replacingOccurrences(of: ",", with: "."))
+        if await store.completeOnboarding(guildClass: selectedClass, displayName: displayName,
+                                          bodyweightLb: weight.flatMap { (60...700).contains($0) ? $0 : nil }) {
+            onFinish()
         }
     }
 }
@@ -88,4 +128,5 @@ private struct ClassOption: View {
     NavigationStack {
         OnboardingView(onFinish: {}, onBack: {})
     }
+    .environment(GameStore.preview)
 }

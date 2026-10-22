@@ -44,4 +44,5 @@ struct ContentView: View {
 
 #Preview {
     ContentView(onLogOut: {})
+        .environment(GameStore.preview)
 }

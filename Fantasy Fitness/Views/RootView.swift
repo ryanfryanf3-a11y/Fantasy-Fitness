@@ -5,14 +5,14 @@
 
 import SwiftUI
 
-/// Title screen and onboarding sit outside the tab shell. Logging in goes to onboarding
-/// the first time (gated by `hasCompletedOnboarding`) and straight to the Guild Hall after.
+/// Title screen and onboarding sit outside the tab shell. After logging in, players who
+/// haven't finished onboarding (stored on their Supabase profile) go there first.
 struct RootView: View {
     private enum Route {
         case title, onboarding, game
     }
 
-    @AppStorage("hasCompletedOnboarding") private var hasCompletedOnboarding = false
+    @Environment(GameStore.self) private var store
     @State private var route: Route = .title
 
     var body: some View {
@@ -20,23 +20,32 @@ struct RootView: View {
             switch route {
             case .title:
                 TitleScreenView(onLoggedIn: {
-                    go(to: hasCompletedOnboarding ? .game : .onboarding)
+                    go(to: store.player.hasCompletedOnboarding ? .game : .onboarding)
                 })
             case .onboarding:
                 NavigationStack {
-                    OnboardingView(
-                        onFinish: {
-                            hasCompletedOnboarding = true
-                            go(to: .game)
-                        },
-                        onBack: { go(to: .title) }
-                    )
+                    OnboardingView(onFinish: { go(to: .game) }, onBack: logOut)
                 }
             case .game:
-                ContentView(onLogOut: { go(to: .title) })
+                ContentView(onLogOut: logOut)
             }
         }
         .preferredColorScheme(.dark)
+        .alert("Something went wrong", isPresented: Binding(
+            get: { store.errorMessage != nil },
+            set: { if !$0 { store.errorMessage = nil } }
+        )) {
+            Button("OK", role: .cancel) {}
+        } message: {
+            Text(store.errorMessage ?? "")
+        }
+    }
+
+    private func logOut() {
+        Task {
+            await store.signOut()
+            go(to: .title)
+        }
     }
 
     private func go(to newRoute: Route) {
@@ -46,4 +55,5 @@ struct RootView: View {
 
 #Preview {
     RootView()
+        .environment(GameStore.preview)
 }

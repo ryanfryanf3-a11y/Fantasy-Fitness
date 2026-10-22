@@ -13,11 +13,11 @@ enum GearRoute: Hashable {
 }
 
 extension View {
-    func gearDestinations(equipped: [Item]) -> some View {
+    func gearDestinations() -> some View {
         navigationDestination(for: GearRoute.self) { route in
             switch route {
-            case .inventory: InventoryView(equipped: equipped)
-            case .item(let item): ItemDetailView(item: item, equipped: equipped)
+            case .inventory: InventoryView()
+            case .item(let item): ItemDetailView(item: item)
             }
         }
     }
