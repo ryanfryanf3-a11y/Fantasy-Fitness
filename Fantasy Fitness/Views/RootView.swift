@@ -31,6 +31,14 @@ struct RootView: View {
             }
         }
         .preferredColorScheme(.dark)
+        // Email confirmation links reopen the app at fantasyfitness://login-callback.
+        .onOpenURL { url in
+            Task {
+                if await store.handleAuthRedirect(url) {
+                    go(to: store.player.hasCompletedOnboarding ? .game : .onboarding)
+                }
+            }
+        }
         .alert("Something went wrong", isPresented: Binding(
             get: { store.errorMessage != nil },
             set: { if !$0 { store.errorMessage = nil } }

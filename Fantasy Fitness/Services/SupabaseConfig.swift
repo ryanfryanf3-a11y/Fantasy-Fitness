@@ -21,19 +21,32 @@ nonisolated struct SupabaseConfig {
               let urlString = (values["SUPABASE_URL"] as? String)?.trimmingCharacters(in: .whitespacesAndNewlines),
               let key = (values["SUPABASE_ANON_KEY"] as? String)?.trimmingCharacters(in: .whitespacesAndNewlines),
               !urlString.contains("YOUR-"), !key.contains("YOUR-"), !key.isEmpty,
-              let url = URL(string: urlString), url.scheme == "https"
+              let parsed = URL(string: urlString), parsed.scheme == "https", let host = parsed.host(),
+              // Keep only https://<project>.supabase.co; the SDK adds /auth/v1, /rest/v1 itself.
+              let url = URL(string: "https://\(host)")
         else { return nil }
         return SupabaseConfig(url: url, anonKey: key)
     }
 }
 
 enum Backend {
+    /// Where email confirmation links and Google sign-in return to. The app registers the
+    /// `fantasyfitness` URL scheme (Fantasy-Fitness-Info.plist). Add this URL under
+    /// Authentication → URL Configuration → Redirect URLs in the Supabase dashboard,
+    /// otherwise Supabase falls back to the Site URL (localhost by default).
+    static let authRedirectURL = URL(string: "fantasyfitness://login-callback")!
+
     /// Shared client, or nil in offline demo mode.
     static let client: SupabaseClient? = SupabaseConfig.load().map {
-        SupabaseClient(supabaseURL: $0.url, supabaseKey: $0.anonKey)
+        SupabaseClient(
+            supabaseURL: $0.url,
+            supabaseKey: $0.anonKey,
+            options: SupabaseClientOptions(auth: .init(
+                redirectToURL: authRedirectURL,
+                // Opt in to the SDK's upcoming default. We never rely on the initial
+                // auth event; `GameStore.resumeSession` validates the session itself.
+                emitLocalSessionAsInitialSession: true
+            ))
+        )
     }
-
-    /// Where Google sign-in returns to. Add it under Authentication → URL Configuration
-    /// → Redirect URLs in the Supabase dashboard.
-    static let authRedirectURL = URL(string: "fantasyfitness://login-callback")!
 }

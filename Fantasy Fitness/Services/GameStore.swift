@@ -73,13 +73,27 @@ final class GameStore {
         do {
             let response = try await client.auth.signUp(email: email, password: password)
             guard response.session != nil else {
-                errorMessage = "Check your email to confirm your account, then log in."
+                errorMessage = "Check your email and tap the confirmation link on this device. "
+                    + "If you open it elsewhere, come back and log in once it says you're confirmed."
                 return false
             }
             await load()
             return isSignedIn
         } catch {
             errorMessage = Self.message(for: error)
+            return false
+        }
+    }
+
+    /// Finishes sign-in from an email confirmation (or other auth) link that opened the app.
+    func handleAuthRedirect(_ url: URL) async -> Bool {
+        guard let client, url.scheme == Backend.authRedirectURL.scheme else { return false }
+        do {
+            try await client.auth.session(from: url)
+            await load()
+            return isSignedIn
+        } catch {
+            errorMessage = "That link didn't work (\(Self.message(for: error))). Try logging in with your email and password."
             return false
         }
     }
