@@ -1,3 +1,4 @@
+-- DISCLAIMER: Changes untested and not gauranteed to be bug-free.
 -- Each inventory row is one owned instance of a catalog item.
 alter table public.inventory
   drop constraint if exists inventory_user_id_item_id_key;
