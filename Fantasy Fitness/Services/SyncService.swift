@@ -245,7 +245,7 @@ final class SyncService {
         async let profile: ProfileRow = client.from("profiles").select().eq("id", value: user).single().execute().value
         async let stats: [StatsRow] = client.from("stats").select().execute().value
         async let items: [ItemRow] = client.from("items").select().execute().value
-        async let inventory: [InventoryRow] = client.from("inventory").select("item_id, equipped").execute().value
+        async let inventory: [InventoryRow] = client.from("inventory").select("id, item_id, equipped").execute().value
         async let quests: [QuestRow] = client.from("quests")
             .select("id, kind, arc, title, rewards, starts_on, ends_on, quest_objectives(id, position, name, detail, target, progress, is_complete, metric, exercise, min_reps, min_weight_lb)")
             .lte("starts_on", value: today)

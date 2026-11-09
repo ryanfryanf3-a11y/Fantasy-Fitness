@@ -212,9 +212,13 @@ final class GameStore {
         let today = LocalDate.string()
         accountEmail = snapshot.email
 
-        catalog = Dictionary(snapshot.items.compactMap(\.item).map { ($0.id, $0) }, uniquingKeysWith: { a, _ in a })
-        inventory = snapshot.inventory.compactMap { catalog[$0.itemID] }
-        let equipped = snapshot.inventory.filter(\.equipped).compactMap { catalog[$0.itemID] }
+        catalog = Dictionary(snapshot.items.compactMap(\.item).map { ($0.itemID, $0) }, uniquingKeysWith: { a, _ in a })
+        inventory = snapshot.inventory.compactMap { row in
+            catalog[row.itemID]?.ownedInstance(id: row.id)
+        }
+        let equipped = snapshot.inventory.filter(\.equipped).compactMap { row in
+            catalog[row.itemID]?.ownedInstance(id: row.id)
+        }
         profile = snapshot.profile.profile(stats: snapshot.stats, equipped: equipped)
 
         var byKind: [QuestKind: Quest] = [:]
@@ -297,7 +301,13 @@ final class GameStore {
             profile?.equipped.append(item)
             return
         }
-        _ = await perform { try await client.rpc("equip_item", params: ["p_item_id": item.id]).execute() }
+        guard let inventoryID = item.instanceID else {
+            errorMessage = "Refresh your inventory before changing equipment."
+            return
+        }
+        _ = await perform {
+            try await client.rpc("equip_item", params: ["p_inventory_id": inventoryID]).execute()
+        }
     }
 
     func unequip(_ item: Item) async {
@@ -305,7 +315,13 @@ final class GameStore {
             profile?.equipped.removeAll { $0 == item }
             return
         }
-        _ = await perform { try await client.rpc("unequip_item", params: ["p_item_id": item.id]).execute() }
+        guard let inventoryID = item.instanceID else {
+            errorMessage = "Refresh your inventory before changing equipment."
+            return
+        }
+        _ = await perform {
+            try await client.rpc("unequip_item", params: ["p_inventory_id": inventoryID]).execute()
+        }
     }
 
     // MARK: - Dungeons

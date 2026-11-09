@@ -21,7 +21,9 @@ enum ItemSlot: String, CaseIterable {
 
 /// Gear boosts in-game combat, XP multipliers or looks only. It never counts toward exams.
 struct Item: Identifiable, Hashable {
-    let id: String
+    let itemID: String
+    let instanceID: UUID?
+    var id: String { instanceID?.uuidString ?? itemID }
     let name: String
     let slot: ItemSlot
     let rarity: Rarity
@@ -31,6 +33,24 @@ struct Item: Identifiable, Hashable {
     /// Dungeon combat bonuses, matching `effect` (items.attack_bonus / defense_bonus).
     var attackBonus = 0
     var defenseBonus = 0
+
+    init(id: String, name: String, slot: ItemSlot, rarity: Rarity, effect: String, flavor: String,
+         instanceID: UUID? = nil, attackBonus: Int = 0, defenseBonus: Int = 0) {
+        itemID = id
+        self.instanceID = instanceID
+        self.name = name
+        self.slot = slot
+        self.rarity = rarity
+        self.effect = effect
+        self.flavor = flavor
+        self.attackBonus = attackBonus
+        self.defenseBonus = defenseBonus
+    }
+
+    func ownedInstance(id: UUID?) -> Item {
+        Item(id: itemID, name: name, slot: slot, rarity: rarity, effect: effect, flavor: flavor,
+             instanceID: id, attackBonus: attackBonus, defenseBonus: defenseBonus)
+    }
 }
 
 // MARK: - Sample data (previews and offline demo mode)

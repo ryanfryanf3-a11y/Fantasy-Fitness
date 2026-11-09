@@ -107,11 +107,12 @@ nonisolated struct ItemRow: Codable, Sendable {
 }
 
 nonisolated struct InventoryRow: Codable, Sendable {
+    let id: UUID?
     let itemID: String
     let equipped: Bool
 
     enum CodingKeys: String, CodingKey {
-        case equipped
+        case id, equipped
         case itemID = "item_id"
     }
 }
