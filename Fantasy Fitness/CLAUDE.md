@@ -60,7 +60,7 @@ Supabase is the backend and the source of truth for anything that affects reward
 - `supabase/migrations/20261106000000_offline_sync.sql`: retry-safe `submit_workout` and `log_meal`. Safe to re-run.
 - `supabase/migrations/20261107000100_item_combat_bonuses.sql`: `items.attack_bonus` / `defense_bonus` for battles. Safe to re-run.
 - `supabase/migrations/20261107000000_sleep_check_in.sql`: `log_rested_night(p_night_of)`, the sleep check-in. Safe to re-run.
-- `supabase/migrations/20261108000000_food_data.sql`: `foods`, `log_food_meal`, `create_recipe` working out macros from searched ingredients, and players can no longer write meal macro columns. Safe to re-run.
+- `supabase/migrations/20261114000000_food_data.sql`: `foods`, `log_food_meal`, `create_recipe` working out macros from searched ingredients, and players can no longer write meal macro columns. Safe to re-run.
 - `supabase/functions/`: Edge Functions (Deno). `food-search` looks foods up on USDA FoodData Central; shared code and its tests are in `_shared/` (see "Edge Functions" below).
 - `supabase/migrations/20261108000000_character_appearance.sql`: `profiles.body_type` / `skin_tone` / `hair_style` / `hair_color`, which players update directly. Safe to re-run.
 - `Fantasy Fitness/Config/Secrets.plist` (gitignored, never commit): `SUPABASE_URL` and `SUPABASE_ANON_KEY`. Copy `Secrets.example.plist` from the repo root to create it. Only the anon/publishable key goes in the app, never the service-role key.

@@ -81,7 +81,7 @@ struct RecipeIngredientDraft: Identifiable, Hashable {
     }
 }
 
-/// Limits the server checks. Keep these in step with 20261108000000_food_data.sql, or a
+/// Limits the server checks. Keep these in step with 20261114000000_food_data.sql, or a
 /// log is refused forever.
 enum FoodLimits {
     static let plateFoods = 30
