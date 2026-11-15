@@ -60,7 +60,7 @@ Supabase is the backend and the source of truth for anything that affects reward
 - `supabase/migrations/20261106000000_offline_sync.sql`: retry-safe `submit_workout` and `log_meal`. Safe to re-run.
 - `supabase/migrations/20261107000100_item_combat_bonuses.sql`: `items.attack_bonus` / `defense_bonus` for battles. Safe to re-run.
 - `supabase/migrations/20261107000000_sleep_check_in.sql`: `log_rested_night(p_night_of)`, the sleep check-in. Safe to re-run.
-- `supabase/migrations/20261108000000_food_data.sql`: `foods`, `log_food_meal`, `create_recipe` working out macros from searched ingredients, and players can no longer write meal macro columns. Safe to re-run.
+- `supabase/migrations/20261108000001_food_data.sql`: `foods`, `log_food_meal`, `create_recipe` working out macros from searched ingredients, and players can no longer write meal macro columns. Safe to re-run.
 - `supabase/functions/`: Edge Functions (Deno). `food-search` looks foods up on USDA FoodData Central; shared code and its tests are in `_shared/` (see "Edge Functions" below).
 - `supabase/migrations/20261108000000_character_appearance.sql`: `profiles.body_type` / `skin_tone` / `hair_style` / `hair_color`, which players update directly. Safe to re-run.
 - `Fantasy Fitness/Config/Secrets.plist` (gitignored, never commit): `SUPABASE_URL` and `SUPABASE_ANON_KEY`. Copy `Secrets.example.plist` from the repo root to create it. Only the anon/publishable key goes in the app, never the service-role key.
@@ -133,6 +133,7 @@ Other storage:
 - `food-search`: `POST {"query", "limit"}` → `{"foods": [{id, source, name, detail, per_100g, portions}]}`. Searches USDA FoodData Central (Foundation, SR Legacy and Survey (FNDDS) foods; no branded foods), saves every result to `foods` with the service role, and returns the row ids, so the app can put a food straight into a recipe or plate.
 - Every function checks the caller's session itself (`_shared/auth.ts`), because it writes with the service role. Errors come back as `{"error": {"code", "message"}}`; `ServerError.message` shows the message as-is, so write it for the player.
 - USDA's top hit can be wrong ("banana" returns dehydrated banana first), so the search shows kcal and protein per 100 g and the player picks. Nothing is picked automatically.
+- No AI is involved: the text the player types goes to USDA as-is, and the results come back unfiltered (apart from leaving out branded foods and foods with no macro data).
 - Pure logic (normalizing USDA data, energy fallbacks, portions) has Deno tests with saved USDA responses: `deno test --allow-read=supabase/functions supabase/functions/`. Imports are pinned `npm:` / `jsr:` versions; there is no import map.
 - Never log request bodies or USDA URLs (the API key is in the query string).
 
@@ -145,9 +146,10 @@ Other storage:
 1. Create a project at supabase.com.
 2. Run every file in `supabase/migrations/` in name order (SQL Editor, or `supabase link` + `supabase db push`).
    - Pick one way and stick to it. Supabase's GitHub integration (and `db push`) tracks applied files in `supabase_migrations.schema_migrations`. A file run by hand in the SQL Editor isn't recorded there, so the integration tries to run it again and fails (e.g. `type "guild_class" already exists`). After running one by hand, record it: `insert into supabase_migrations.schema_migrations (version, name) values ('<timestamp>', '<name>') on conflict do nothing;`
-   - Every migration needs a unique timestamp. Supabase identifies a file by the number before the underscore only, so two files with the same number clash (`duplicate key ... schema_migrations_pkey`) and the second never runs. Before adding a file, check the newest number in `supabase/migrations/` (on an up-to-date `main`) and use a later one.
+   - Every migration needs a unique timestamp. Supabase identifies a file by the number before the underscore only, so two files with the same number clash (`duplicate key ... schema_migrations_pkey`) and the second never runs. Before adding a file, check the newest number in `supabase/migrations/` (on an up-to-date `main`) and use a later one. To keep two people from picking the same number, Akash's files end in `01` (e.g. `20261108000001`) and Ryan's end in `00`.
 3. Put the Project URL and anon key in `Config/Secrets.plist`.
    - Edge Functions: get a free FoodData Central key at api.data.gov, then `supabase secrets set USDA_API_KEY=<key>` and `supabase functions deploy food-search`. Without the key it falls back to USDA's `DEMO_KEY`, which allows only a few searches an hour.
+     - `USDA_API_KEY` is a server secret only. It never goes in `Secrets.plist`. To run the functions locally with `supabase functions serve`, put it in `supabase/functions/.env` (gitignored).
 4. Auth providers: Email is on by default. Apple needs the bundle ID `com.appteamcarolina.Fantasy-Fitness` under Client IDs plus the Sign in with Apple capability in Xcode. Google needs a Google Cloud OAuth client. Add `fantasyfitness://login-callback` under Authentication → URL Configuration → Redirect URLs.
 
 ## Game systems
