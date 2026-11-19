@@ -1,0 +1,46 @@
+Inventory instance update
+========================
+
+Swift app changes
+-----------------
+- Item now distinguishes the shared catalog ID (`itemID`) from an owned
+  inventory row UUID (`instanceID`).
+- Item.id uses the instance UUID when available, so separate copies can have
+  distinct SwiftUI identities. Catalog/sample items without an instance UUID
+  continue to use their catalog ID.
+- Inventory sync now fetches each inventory row's `id`, `item_id`, and
+  `equipped` status, then attaches the row UUID to the matching catalog item.
+- Equip and unequip RPC calls now send `p_inventory_id` using the instance UUID.
+- If an item has no instance UUID, the app reports that inventory must be
+  refreshed instead of calling the RPC with the wrong identifier.
+
+Database migration: 20261108224500_inventory_instances.sql
+----------------------------------------------------------
+- Drops the unique constraint on (user_id, item_id), allowing multiple
+  inventory rows to refer to the same catalog item.
+- Adds `instance_data` as a JSON object with an empty-object default (`{}`),
+  ready for future per-instance properties. The client does not yet read or
+  apply this data.
+- Replaces equip_item(text) and unequip_item(text) with UUID-based versions.
+  They operate on a specific inventory row and verify that it belongs to the
+  signed-in player. Equipping an item still unequips other items in that slot.
+
+Database migration: 20261108232700_grant_random_item_returns_instance_uuid.sql
+-----------------------------------------------------------------------------
+- Replaces grant_random_item so it returns the UUID of the inserted inventory
+  row instead of the catalog item ID.
+- The function still skips catalog items the player already owns; duplicate
+  drops are therefore not enabled yet.
+- Updates finish_dungeon_run to preserve the existing `xp`, `item_ids`, and
+  `chest_rarity` response fields, and adds `inventory_ids` for the specific
+  inventory rows awarded. The existing `dungeon_runs.loot_item_ids` field
+  continues to store catalog item IDs.
+- The client does not yet use `inventory_ids` in dungeon reward reveals.
+
+Status and testing
+------------------
+- These changes establish inventory-instance identity, but do not implement
+  procedural generation or parsing of item effects.
+- Apply the inventory-instance migration before the grant-function migration.
+- The migrations and full app flow have not been verified against a Supabase
+  database. Test on a separate development database before deployment.
