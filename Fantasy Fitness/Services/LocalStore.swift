@@ -2,8 +2,8 @@
 //  LocalStore.swift
 //  Fantasy Fitness
 //
-//  The on-device SwiftData store. Player-created logs (workouts, sets, meals, sleep) are saved
-//  here first and stay until the server has them. Server-owned data is kept as one
+//  The on-device SwiftData store. Player-created logs (workouts, sets, meals, sleep, cardio)
+//  are saved here first and stay until the server has them. Server-owned data is kept as one
 //  snapshot per player, replaced whole on every refresh because the server always wins.
 //
 
@@ -140,6 +140,29 @@ final class LocalSleep {
     }
 }
 
+/// A cardio workout imported from Apple Health. Uses the HKWorkout's UUID so
+/// re-importing or retrying an upload never creates a duplicate row on the server.
+@Model
+final class LocalCardio {
+    @Attribute(.unique) var id: UUID
+    var userID: UUID
+    var loggedOn: String
+    var activity: String
+    var distanceKm: Double
+    var durationMin: Double
+    var uploadedAt: Date?
+    var lastError: String?
+
+    init(id: UUID, userID: UUID, loggedOn: String, activity: String, distanceKm: Double, durationMin: Double) {
+        self.id = id
+        self.userID = userID
+        self.loggedOn = loggedOn
+        self.activity = activity
+        self.distanceKm = distanceKm
+        self.durationMin = durationMin
+    }
+}
+
 /// The last `ServerSnapshot` for a player, as JSON. If a future version can't decode
 /// it, that just counts as an empty cache and the next refresh replaces it.
 @Model
@@ -160,7 +183,7 @@ final class LocalStore {
 
     init(inMemory: Bool = false) {
         let schema = Schema([LocalWorkout.self, LocalSet.self, LocalMeal.self, LocalPlateMeal.self, LocalSleep.self,
-                             CachedSnapshot.self])
+                             LocalCardio.self, CachedSnapshot.self])
         let configuration = ModelConfiguration(schema: schema, isStoredInMemoryOnly: inMemory)
         do {
             context = ModelContext(try ModelContainer(for: schema, configurations: configuration))
@@ -313,6 +336,23 @@ final class LocalStore {
     func deleteUploadedSleeps(for user: UUID) throws {
         for sleep in sleeps(for: user) where sleep.uploadedAt != nil { context.delete(sleep) }
         try context.save()
+    }
+
+    // MARK: - Cardio
+
+    /// Queues a HealthKit cardio workout if we haven't already stored its UUID.
+    @discardableResult
+    func addCardioIfNew(_ cardio: LocalCardio) throws -> Bool {
+        let targetID = cardio.id
+        let existing = try? context.fetch(FetchDescriptor(predicate: #Predicate<LocalCardio> { $0.id == targetID })).first
+        guard existing == nil else { return false }
+        context.insert(cardio)
+        try context.save()
+        return true
+    }
+
+    func cardio(for user: UUID) -> [LocalCardio] {
+        (try? context.fetch(FetchDescriptor(predicate: #Predicate<LocalCardio> { $0.userID == user }))) ?? []
     }
 
     /// Commits changes made directly to a model (upload status, last error).

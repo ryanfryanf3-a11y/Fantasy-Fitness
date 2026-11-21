@@ -45,6 +45,22 @@ struct GuildHallView: View {
                         .buttonStyle(.chunky(.emerald, minHeight: 44, fullWidth: false, fontSize: 16))
                 }
                 DashedDivider()
+                TodayRow(palette: .amethyst, systemImage: "figure.walk",
+                         title: "Daily march",
+                         detail: store.healthKit.isAuthorized
+                             ? DailySteps.summary(steps: store.healthKit.todaySteps)
+                             : "Track \(DailySteps.goal.formatted()) daily steps with Apple Health",
+                         progress: store.healthKit.isAuthorized
+                             ? DailySteps.progress(steps: store.healthKit.todaySteps)
+                             : nil) {
+                    if !store.healthKit.isAuthorized && store.healthKit.isAvailable {
+                        Button("Connect Health") {
+                            Task { await store.connectHealthKit() }
+                        }
+                        .buttonStyle(.chunky(.amethyst, minHeight: 44, fullWidth: false, fontSize: 16))
+                    }
+                }
+                DashedDivider()
                 TodayRow(palette: .sapphire, systemImage: "moon.zzz.fill",
                          title: "Rest at the inn",
                          detail: Recovery.summary(lastNight: store.sleep.lastNightHours),
