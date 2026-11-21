@@ -30,7 +30,7 @@ struct QuestBoardView: View {
                                     : "New quests are posted each day and week.")
                 }
             }
-            PinnedNotesGrid()
+            PinnedNotesGrid(kind: selectedKind)
                 .padding(.top, 8)
         }
         .workoutSessionCover($activeWorkout)
