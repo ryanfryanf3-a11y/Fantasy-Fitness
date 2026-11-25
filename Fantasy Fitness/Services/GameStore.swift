@@ -216,10 +216,10 @@ final class GameStore {
 
         catalog = Dictionary(snapshot.items.compactMap(\.item).map { ($0.itemID, $0) }, uniquingKeysWith: { a, _ in a })
         inventory = snapshot.inventory.compactMap { row in
-            catalog[row.itemID]?.ownedInstance(id: row.id)
+            catalog[row.itemID]?.ownedInstance(id: row.id, stats: row.instanceStats)
         }
         let equipped = snapshot.inventory.filter(\.equipped).compactMap { row in
-            catalog[row.itemID]?.ownedInstance(id: row.id)
+            catalog[row.itemID]?.ownedInstance(id: row.id, stats: row.instanceStats)
         }
         profile = snapshot.profile.profile(stats: snapshot.stats, equipped: equipped)
 

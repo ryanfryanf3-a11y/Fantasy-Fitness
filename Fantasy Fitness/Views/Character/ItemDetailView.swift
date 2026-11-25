@@ -45,6 +45,15 @@ struct ItemDetailView: View {
                 TagChip(label: item.effect, systemImage: "sparkles")
                     .padding(.top, 8)
 
+                if let stats = item.instanceStatsDescription {
+                    Text("Instance stats")
+                        .font(.alegreya(18))
+                        .foregroundStyle(Theme.ink)
+                        .padding(.top, 16)
+                    TagChip(label: stats, systemImage: "chart.bar.fill")
+                        .padding(.top, 8)
+                }
+
                 Text(isEquipped ? "On your character" : "Try it on")
                     .font(.alegreya(18))
                     .foregroundStyle(Theme.ink)

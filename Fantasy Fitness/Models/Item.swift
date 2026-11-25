@@ -19,6 +19,15 @@ enum ItemSlot: String, CaseIterable {
     var name: String { rawValue.capitalized }
 }
 
+struct ItemInstanceStats: Hashable {
+    let attack: Int
+    let defense: Int
+    let hp: Int
+    let regeneration: Int
+    let hitChance: Double
+    let critChance: Double
+}
+
 /// Gear boosts in-game combat, XP multipliers or looks only. It never counts toward exams.
 struct Item: Identifiable, Hashable {
     let itemID: String
@@ -33,9 +42,11 @@ struct Item: Identifiable, Hashable {
     /// Dungeon combat bonuses, matching `effect` (items.attack_bonus / defense_bonus).
     var attackBonus = 0
     var defenseBonus = 0
+    var instanceStats: ItemInstanceStats?
 
     init(id: String, name: String, slot: ItemSlot, rarity: Rarity, effect: String, flavor: String,
-         instanceID: UUID? = nil, attackBonus: Int = 0, defenseBonus: Int = 0) {
+         instanceID: UUID? = nil, attackBonus: Int = 0, defenseBonus: Int = 0,
+         instanceStats: ItemInstanceStats? = nil) {
         itemID = id
         self.instanceID = instanceID
         self.name = name
@@ -45,11 +56,41 @@ struct Item: Identifiable, Hashable {
         self.flavor = flavor
         self.attackBonus = attackBonus
         self.defenseBonus = defenseBonus
+        self.instanceStats = instanceStats
     }
 
-    func ownedInstance(id: UUID?) -> Item {
+    var effectiveAttackBonus: Int {
+        max(instanceStats?.attack ?? attackBonus, attackBonus)
+    }
+
+    var effectiveDefenseBonus: Int {
+        max(instanceStats?.defense ?? defenseBonus, defenseBonus)
+    }
+
+    var instanceStatsDescription: String? {
+        guard let instanceStats else { return nil }
+        var stats: [String] = []
+        let attack = max(instanceStats.attack, attackBonus)
+        let defense = max(instanceStats.defense, defenseBonus)
+
+        if attack > 0 { stats.append("Attack +\(attack)") }
+        if defense > 0 { stats.append("Defense +\(defense)") }
+        if instanceStats.hp > 0 { stats.append("HP +\(instanceStats.hp)") }
+        if instanceStats.regeneration > 0 { stats.append("Regeneration +\(instanceStats.regeneration)") }
+        if instanceStats.hitChance > 0 { stats.append("Hit +\(Self.percentage(instanceStats.hitChance))%") }
+        if instanceStats.critChance > 0 { stats.append("Crit +\(Self.percentage(instanceStats.critChance))%") }
+
+        return stats.isEmpty ? nil : stats.joined(separator: " · ")
+    }
+
+    private static func percentage(_ fraction: Double) -> Int {
+        Int((fraction * 100).rounded())
+    }
+
+    func ownedInstance(id: UUID?, stats: ItemInstanceStats? = nil) -> Item {
         Item(id: itemID, name: name, slot: slot, rarity: rarity, effect: effect, flavor: flavor,
-             instanceID: id, attackBonus: attackBonus, defenseBonus: defenseBonus)
+             instanceID: id, attackBonus: attackBonus, defenseBonus: defenseBonus,
+             instanceStats: stats)
     }
 }
 

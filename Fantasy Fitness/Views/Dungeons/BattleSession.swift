@@ -199,8 +199,8 @@ extension Fighter {
                   speed: profile.stats[.speed] ?? 0,
                   agility: profile.stats[.agility] ?? 0,
                   vitality: profile.stats[.vitality] ?? 0,
-                  gearAttack: profile.equipped.reduce(0) { $0 + $1.attackBonus },
-                  gearDefense: profile.equipped.reduce(0) { $0 + $1.defenseBonus })
+                  gearAttack: profile.equipped.reduce(0) { $0 + $1.effectiveAttackBonus },
+                  gearDefense: profile.equipped.reduce(0) { $0 + $1.effectiveDefenseBonus })
     }
 }
 
