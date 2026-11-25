@@ -29,6 +29,7 @@ nonisolated enum BattleRules {
 
     // Timing meter: nudges damage, never replaces training.
     static let hitZoneWidth = 0.5
+    static let maxHitZoneWidth = 0.9
     static let baseGoldZone = 0.12
     static let goldZonePerAgility = 0.0025
     static let maxGoldZone = 0.3
@@ -104,21 +105,35 @@ nonisolated struct Fighter: Sendable {
     // Where the numbers come from, for the loadout.
     let healthFromVitality: Int
     let healthFromEndurance: Int
+    let healthFromGear: Int
     let attackFromStrength: Int
     let attackFromGear: Int
+    let gearDefense: Int
+    let gearHP: Int
+    let gearRegeneration: Int
+    let gearHitChance: Double
+    let gearCritChance: Double
 
     init(name: String, skill: ClassSkill, strength: Int, endurance: Int, speed: Int, agility: Int,
-         vitality: Int, gearAttack: Int, gearDefense: Int) {
+         vitality: Int, gearAttack: Int, gearDefense: Int, gearHP: Int, gearRegeneration: Int,
+         gearHitChance: Double, gearCritChance: Double) {
         self.name = name
         self.skill = skill
         healthFromVitality = max(vitality, 0)
         healthFromEndurance = max(endurance, 0) / BattleRules.endurancePerHealth
+        healthFromGear = max(gearHP, 0)
         attackFromStrength = max(strength, 0) / BattleRules.strengthPerAttack
         attackFromGear = max(gearAttack, 0)
-        maxHealth = BattleRules.baseHealth + healthFromVitality + healthFromEndurance
+        self.gearDefense = max(gearDefense, 0)
+        self.gearHP = max(gearHP, 0)
+        self.gearRegeneration = max(gearRegeneration, 0)
+        self.gearHitChance = max(gearHitChance, 0)
+        self.gearCritChance = max(gearCritChance, 0)
+        maxHealth = BattleRules.baseHealth + healthFromVitality + healthFromEndurance + healthFromGear
         attack = BattleRules.baseAttack + attackFromStrength + attackFromGear
-        defense = max(gearDefense, 0)
-        goldZone = min(BattleRules.baseGoldZone + Double(max(agility, 0)) * BattleRules.goldZonePerAgility,
+        defense = self.gearDefense
+        goldZone = min(BattleRules.baseGoldZone + Double(max(agility, 0)) * BattleRules.goldZonePerAgility
+                           + self.gearCritChance,
                        BattleRules.maxGoldZone)
         sweepDuration = min(BattleRules.baseSweep + Double(max(speed, 0)) * BattleRules.sweepPerSpeed,
                             BattleRules.maxSweep)
@@ -240,7 +255,7 @@ nonisolated struct BattleState: Sendable {
 
     /// Places the hit and gold zones for one swing. Heavy Blow gets half the gold zone.
     mutating func rollZones(for action: PlayerAction) -> MeterZones {
-        let hitWidth = BattleRules.hitZoneWidth
+        let hitWidth = min(BattleRules.hitZoneWidth + player.gearHitChance, BattleRules.maxHitZoneWidth)
         let goldWidth = action == .heavyBlow ? player.goldZone / 2 : player.goldZone
         let hitStart = Double.random(in: 0.05...(0.95 - hitWidth), using: &rng)
         let goldStart = Double.random(in: hitStart...(hitStart + hitWidth - goldWidth), using: &rng)
@@ -319,6 +334,14 @@ nonisolated struct BattleState: Sendable {
                     outcome = .lost
                     events.append(.lost)
                 }
+            }
+        }
+
+        if outcome == nil, playerHealth > 0, player.gearRegeneration > 0 {
+            let healing = min(player.gearRegeneration, player.maxHealth - playerHealth)
+            if healing > 0 {
+                playerHealth += healing
+                events.append(.healed(healing))
             }
         }
 
