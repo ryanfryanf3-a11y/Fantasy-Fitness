@@ -120,10 +120,26 @@ nonisolated struct InventoryRow: Codable, Sendable {
     let id: UUID?
     let itemID: String
     let equipped: Bool
+    let attack: Int?
+    let defense: Int?
+    let hp: Int?
+    let regeneration: Int?
+    let hitChance: Double?
+    let critChance: Double?
 
     enum CodingKeys: String, CodingKey {
-        case id, equipped
+        case id, equipped, attack, defense, hp, regeneration
         case itemID = "item_id"
+        case hitChance = "hit_chance"
+        case critChance = "crit_chance"
+    }
+
+    var instanceStats: ItemInstanceStats? {
+        guard let attack, let defense, let hp, let regeneration, let hitChance, let critChance else {
+            return nil
+        }
+        return ItemInstanceStats(attack: attack, defense: defense, hp: hp, regeneration: regeneration,
+                                 hitChance: hitChance, critChance: critChance)
     }
 }
 

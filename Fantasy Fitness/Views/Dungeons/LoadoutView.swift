@@ -48,14 +48,15 @@ struct LoadoutView: View {
                 let fighter = Fighter(profile: profile)
                 powerRow("Health", value: "\(fighter.maxHealth)", systemImage: "heart.fill",
                          tint: StatKind.vitality.palette.fill,
-                         detail: "\(BattleRules.baseHealth) base + \(fighter.healthFromVitality) Vitality + \(fighter.healthFromEndurance) Endurance")
+                         detail: "\(BattleRules.baseHealth) base + \(fighter.healthFromVitality) Vitality + \(fighter.healthFromEndurance) Endurance + \(fighter.healthFromGear) gear")
                 powerRow("Attack", value: "\(fighter.attack)", systemImage: "bolt.fill",
                          tint: StatKind.strength.palette.fill,
                          detail: "\(BattleRules.baseAttack) base + \(fighter.attackFromStrength) Strength + \(fighter.attackFromGear) gear")
                 powerRow("Defense", value: "\(fighter.defense)", systemImage: "shield.fill",
                          tint: Theme.sapphire, detail: "From equipped armor")
                 powerRow("Critical zone", value: "\(Int((fighter.goldZone * 100).rounded()))%", systemImage: "scope",
-                         tint: StatKind.agility.palette.fill, detail: "Gold on the timing meter, wider with Agility")
+                         tint: StatKind.agility.palette.fill,
+                         detail: "Gold on the timing meter, wider with Agility and gear")
                 powerRow(fighter.skill.name, value: "", systemImage: fighter.skill.systemImage,
                          tint: profile.guildClass.palette.fill,
                          detail: "\(profile.guildClass.name) skill: \(fighter.skill.summary.lowercased()), every \(BattleRules.skillCooldown) turns")

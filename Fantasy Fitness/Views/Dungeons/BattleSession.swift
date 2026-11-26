@@ -193,14 +193,25 @@ extension BattleSession {
 extension Fighter {
     /// Real stats plus equipped gear's bonuses.
     init(profile: PlayerProfile) {
+        let gearAttack = profile.equipped.reduce(0) { $0 + $1.effectiveAttackBonus }
+        let gearDefense = profile.equipped.reduce(0) { $0 + $1.effectiveDefenseBonus }
+        let gearHP = profile.equipped.reduce(0) { $0 + ($1.instanceStats?.hp ?? 0) }
+        let gearRegeneration = profile.equipped.reduce(0) { $0 + ($1.instanceStats?.regeneration ?? 0) }
+        let gearHitChance = profile.equipped.reduce(0) { $0 + ($1.instanceStats?.hitChance ?? 0) }
+        let gearCritChance = profile.equipped.reduce(0) { $0 + ($1.instanceStats?.critChance ?? 0) }
+
         self.init(name: profile.displayName, skill: profile.guildClass.skill,
                   strength: profile.stats[.strength] ?? 0,
                   endurance: profile.stats[.endurance] ?? 0,
                   speed: profile.stats[.speed] ?? 0,
                   agility: profile.stats[.agility] ?? 0,
                   vitality: profile.stats[.vitality] ?? 0,
-                  gearAttack: profile.equipped.reduce(0) { $0 + $1.attackBonus },
-                  gearDefense: profile.equipped.reduce(0) { $0 + $1.defenseBonus })
+                  gearAttack: gearAttack,
+                  gearDefense: gearDefense,
+                  gearHP: gearHP,
+                  gearRegeneration: gearRegeneration,
+                  gearHitChance: gearHitChance,
+                  gearCritChance: gearCritChance)
     }
 }
 
