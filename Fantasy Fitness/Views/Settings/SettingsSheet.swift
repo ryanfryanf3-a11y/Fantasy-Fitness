@@ -20,6 +20,21 @@ struct SettingsSheet: View {
         return store.refreshError == nil ? "Connected" : "Couldn't refresh"
     }
 
+    private var healthStatus: String {
+        if !store.healthKit.isAvailable { return "Unavailable" }
+        if store.healthKit.isSyncing { return "Syncing…" }
+        guard store.healthKit.isAuthorized else { return "Not connected" }
+        var parts: [String] = []
+        if let hours = store.healthKit.lastNightSleepHours {
+            parts.append(String(format: "%.1f h sleep", hours))
+        }
+        let cardioCount = store.healthKit.recentCardio.count
+        if cardioCount > 0 {
+            parts.append("\(cardioCount) cardio")
+        }
+        return parts.isEmpty ? "Connected" : parts.joined(separator: " · ")
+    }
+
     var body: some View {
         SheetScaffold(title: "Settings") {
             VStack(spacing: 0) {
@@ -36,17 +51,51 @@ struct SettingsSheet: View {
                     row("Last synced", detail: lastSynced.formatted(.relative(presentation: .named)),
                         systemImage: "clock.fill")
                 }
+                row("Apple Health", detail: healthStatus, systemImage: "heart.fill")
                 // All weights are stored in pounds (bodyweight_lb, weight_lb).
                 row("Units", detail: "lb", systemImage: "scalemass.fill")
+            }
+
+            if let healthError = store.healthKit.lastError {
+                Text(healthError)
+                    .font(.alegreyaSans(14))
+                    .foregroundStyle(Theme.inkSecondary)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .padding(.top, 8)
+            }
+
+            if store.healthKit.isAvailable {
+                VStack(spacing: 12) {
+                    if store.healthKit.isAuthorized {
+                        Button(store.healthKit.isSyncing ? "Syncing Apple Health…" : "Sync Apple Health") {
+                            Task { await store.syncHealthKit() }
+                        }
+                        .buttonStyle(.chunky(.wood))
+                        .disabled(store.healthKit.isSyncing)
+
+                        Button("Disconnect Apple Health") {
+                            store.disconnectHealthKit()
+                        }
+                        .font(.alegreyaSans(15, weight: .bold))
+                        .foregroundStyle(Theme.inkSecondary)
+                        .frame(minHeight: 44)
+                    } else {
+                        Button("Connect Apple Health") {
+                            Task { await store.connectHealthKit() }
+                        }
+                        .buttonStyle(.chunky(.wood))
+                    }
+                }
+                .padding(.top, 20)
             }
 
             if let onLogOut {
                 Button("Log out", action: onLogOut)
                     .buttonStyle(.chunky(.wood))
-                    .padding(.top, 28)
+                    .padding(.top, 16)
             }
         }
-        .presentationDetents([.medium])
+        .presentationDetents([.medium, .large])
     }
 
     private func row(_ title: String, detail: String, systemImage: String) -> some View {

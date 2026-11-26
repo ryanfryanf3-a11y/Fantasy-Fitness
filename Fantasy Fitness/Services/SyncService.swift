@@ -4,8 +4,9 @@
 //
 //  Keeps the device and Supabase in step. Each pass uploads whatever is queued on the
 //  phone, then replaces the local copy of server-owned data. Runs when the app opens or
-//  returns to the foreground, when the connection comes back, after a workout, meal or
-//  sleep check-in is saved, and on pull to refresh. The server decides all rewards; this only reports them.
+//  returns to the foreground, when the connection comes back, after a workout, meal,
+//  sleep check-in or cardio session is saved, and on pull to refresh. The server decides
+//  all rewards; this only reports them.
 //
 
 import Foundation
@@ -30,6 +31,7 @@ final class SyncService {
     private(set) var pendingWorkouts = 0
     private(set) var pendingMeals = 0
     private(set) var pendingSleeps = 0
+    private(set) var pendingCardio = 0
     private(set) var lastSyncedAt: Date?
     /// Uploaded workouts whose rewards the player hasn't seen yet.
     private(set) var rewards: [UploadedWorkout] = []
@@ -49,12 +51,13 @@ final class SyncService {
         if client != nil { startMonitoring() }
     }
 
-    var pendingCount: Int { pendingWorkouts + pendingMeals + pendingSleeps }
+    var pendingCount: Int { pendingWorkouts + pendingMeals + pendingSleeps + pendingCardio }
 
     /// "1 workout and 2 meals waiting to upload.", or nil when the queue is empty.
     var queueSummary: String? {
         let parts = [Self.count(pendingWorkouts, "workout"), Self.count(pendingMeals, "meal"),
-                     Self.count(pendingSleeps, "sleep check-in")].compactMap { $0 }
+                     Self.count(pendingSleeps, "sleep check-in"),
+                     Self.count(pendingCardio, "cardio session")].compactMap { $0 }
         return parts.isEmpty ? nil : ListFormatter.localizedString(byJoining: parts) + " waiting to upload."
     }
 
@@ -79,12 +82,14 @@ final class SyncService {
             pendingWorkouts = 0
             pendingMeals = 0
             pendingSleeps = 0
+            pendingCardio = 0
             return
         }
         pendingWorkouts = local.pendingWorkouts(for: user).count
         pendingMeals = local.meals(for: user).filter { $0.uploadedAt == nil }.count
             + local.plates(for: user).filter { $0.uploadedAt == nil }.count
         pendingSleeps = local.sleeps(for: user).filter { $0.uploadedAt == nil }.count
+        pendingCardio = local.cardio(for: user).filter { $0.uploadedAt == nil }.count
     }
 
     // MARK: - Running a sync
@@ -141,6 +146,7 @@ final class SyncService {
             try await uploadWorkouts(client, user: user)
             try await uploadMeals(client, user: user)
             try await uploadSleeps(client, user: user)
+            try await uploadCardio(client, user: user)
             let snapshot = try await fetchSnapshot(client, user: user, email: session.user.email, today: today)
 
             guard self.user == user else { return }  // logged out meanwhile
@@ -250,6 +256,41 @@ final class SyncService {
             } catch {
                 let message = ServerError.message(for: error)
                 sleep.lastError = message
+                uploadError = message
+            }
+            try local.save()
+            queueChanged()
+        }
+    }
+
+    private struct NewCardioRow: Encodable, Sendable {
+        let id: UUID
+        let logged_on: String
+        let activity: String
+        let distance_km: Double
+        let duration_min: Double
+    }
+
+    private func uploadCardio(_ client: SupabaseClient, user: UUID) async throws {
+        for item in local.cardio(for: user) where item.uploadedAt == nil {
+            let row = NewCardioRow(
+                id: item.id,
+                logged_on: item.loggedOn,
+                activity: item.activity,
+                distance_km: item.distanceKm,
+                duration_min: item.durationMin
+            )
+            do {
+                try await client.from("cardio_logs")
+                    .upsert(row, onConflict: "id", ignoreDuplicates: true)
+                    .execute()
+                item.uploadedAt = .now
+                item.lastError = nil
+            } catch let error where ServerError.isUnreachable(error) || ServerError.isCancelled(error) {
+                throw error
+            } catch {
+                let message = ServerError.message(for: error)
+                item.lastError = message
                 uploadError = message
             }
             try local.save()

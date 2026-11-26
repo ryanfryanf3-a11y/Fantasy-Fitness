@@ -4,8 +4,9 @@
 //
 //  The app's single source of player data. Views read it from here; it shows the
 //  local cache straight away and SyncService keeps that cache in step with Supabase.
-//  Workouts, meals and sleep check-ins (SleepService) are saved on the device first. Actions the server has to decide
-//  on the spot (gear, dungeons, recipes) need a connection and call it directly.
+//  Workouts, meals, sleep check-ins (SleepService) and HealthKit cardio (HealthKitService)
+//  are saved on the device first. Actions the server has to decide on the spot (gear,
+//  dungeons, recipes) need a connection and call it directly.
 //  Without Config/Secrets.plist it runs in offline demo mode on sample data.
 //
 
@@ -43,6 +44,7 @@ final class GameStore {
     @ObservationIgnored let sync: SyncService
     @ObservationIgnored let sleep: SleepService
     @ObservationIgnored let food: FoodService
+    @ObservationIgnored let healthKit: HealthKitService
     @ObservationIgnored private let local: LocalStore
     @ObservationIgnored private var userID: UUID?
     @ObservationIgnored private var catalog: [String: Item] = [:]
@@ -54,6 +56,7 @@ final class GameStore {
         sync = SyncService(client: client, local: local)
         sleep = SleepService(local: local, sync: sync)
         food = FoodService(client: client)
+        healthKit = HealthKitService()
         sync.onSnapshot = { [weak self] in self?.apply($0) }
     }
 
@@ -78,6 +81,9 @@ final class GameStore {
         if let cached = local.snapshot(for: session.user.id) {
             startUsing(session.user.id)
             apply(cached)
+            if healthKit.isEnabled {
+                Task { await syncHealthKit() }
+            }
             sync.requestSync()
             return true
         }
@@ -197,14 +203,80 @@ final class GameStore {
     func load() async {
         guard client != nil else {
             loadDemo()
+            if healthKit.isEnabled { await syncHealthKit(requestUpload: false) }
             return
         }
+        if healthKit.isEnabled { await syncHealthKit(requestUpload: false) }
         if !hasData { loadState = .loading }
         await sync.sync()
         if !hasData {
             loadState = .failed(sync.refreshError ?? "You're offline. Connect once to load your guild.")
         } else if sync.isOffline, let latestSnapshot {
             apply(latestSnapshot)  // the date may have moved on since this was fetched
+        }
+    }
+
+    // MARK: - HealthKit
+
+    /// Prompts for Apple Health access and immediately imports sleep, steps & cardio.
+    func connectHealthKit() async {
+        await healthKit.connect()
+        if healthKit.isAuthorized {
+            await syncHealthKit()
+        }
+    }
+
+    func disconnectHealthKit() {
+        healthKit.disconnect()
+    }
+
+    /// Reads last night's sleep, weekly steps, and recent cardio from Apple Health,
+    /// auto-checking "Rest at the inn" at 7+ hours, upserting daily step summaries for
+    /// Forge Week, and queuing new cardio workouts.
+    func syncHealthKit(requestUpload: Bool = true) async {
+        guard healthKit.isEnabled else { return }
+        await healthKit.refresh()
+
+        if let hours = healthKit.lastNightSleepHours,
+           hours >= Recovery.wellRestedHours,
+           !sleep.isWellRested {
+            try? sleep.checkIn()
+        }
+
+        guard let client, let userID else { return }
+
+        var uploadedSteps = false
+        let stepRows = healthKit.weeklySteps
+            .filter { !$0.loggedOn.isEmpty && $0.steps > 0 }
+            .map { StepLogRow(logged_on: $0.loggedOn, steps: $0.steps) }
+        if !stepRows.isEmpty {
+            if (try? await client.from("step_logs")
+                .upsert(stepRows, onConflict: "user_id,logged_on", returning: .minimal)
+                .execute()) != nil {
+                uploadedSteps = true
+            }
+        }
+
+        var queuedNewCardio = false
+        for workout in healthKit.recentCardio {
+            let localCardio = LocalCardio(
+                id: workout.id,
+                userID: userID,
+                loggedOn: workout.loggedOn,
+                activity: workout.activity,
+                distanceKm: workout.distanceKm,
+                durationMin: workout.durationMin
+            )
+            if (try? local.addCardioIfNew(localCardio)) == true {
+                queuedNewCardio = true
+            }
+        }
+
+        if queuedNewCardio {
+            sync.queueChanged()
+        }
+        if requestUpload && (queuedNewCardio || uploadedSteps) {
+            sync.requestSync()
         }
     }
 
@@ -621,6 +693,11 @@ nonisolated private struct CreateRecipeParams: Encodable, Sendable {
     let p_minutes: Int
     let p_servings: Int
     let p_ingredients: [NewIngredient]
+}
+
+nonisolated private struct StepLogRow: Encodable, Sendable {
+    let logged_on: String
+    let steps: Int
 }
 
 extension Macros {

@@ -115,3 +115,15 @@ enum Recovery {
         return "Last night: \(slept) h · aim for \(wellRestedHours.formatted())+"
     }
 }
+/// Daily steps goal tracked via Apple Health.
+enum DailySteps {
+    static let goal = 8_000
+
+    static func progress(steps: Int) -> Double {
+        min(1, Double(steps) / Double(goal))
+    }
+
+    static func summary(steps: Int) -> String {
+        "Steps \(steps.formatted()) / \(goal.formatted())"
+    }
+}
